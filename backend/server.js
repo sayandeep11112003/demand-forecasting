@@ -6,9 +6,15 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
+import dns from "dns";
 import { fileURLToPath } from "url";
 
 dotenv.config();
+
+// Some hosts (e.g. Render) advertise IPv6 routes that aren't actually reachable,
+// which makes outbound SMTP to smtp.gmail.com hang/fail with ENETUNREACH when
+// Node picks the AAAA record first. Prefer IPv4 to avoid that.
+dns.setDefaultResultOrder("ipv4first");
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_FILE = path.join(__dirname, "data", "users.json");
@@ -16,8 +22,10 @@ const DATA_FILE = path.join(__dirname, "data", "users.json");
 const PORT = process.env.PORT || 4000;
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "sayandeepvirat10@gmail.com";
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`;
-const FRONTEND_URLS = (process.env.FRONTEND_URL || "http://localhost:5173")
-  .split(",")
+const FRONTEND_URLS = [
+  PUBLIC_BASE_URL,
+  ...(process.env.FRONTEND_URL || "http://localhost:5173").split(","),
+]
   .map((s) => s.trim())
   .filter(Boolean);
 const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
