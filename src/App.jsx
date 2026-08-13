@@ -387,7 +387,6 @@ const SCHEMA = {
   projects: {
     label: "Projects", icon: FolderKanban, idKey: "project_id",
     category: "1. Project Master Data",
-    desc: "Transmission lines, substations, HVDC stations and grid works, tracked against contract milestones.",
     writeRoles: [ADMIN, PROC], searchKeys: ["project_code", "project_name", "location_state"],
     columns: ["project_code", "project_name", "project_type", "voltage_class", "location_state", "percent_complete", "project_status"],
     fields: [
@@ -411,7 +410,6 @@ const SCHEMA = {
   suppliers: {
     label: "Suppliers", icon: Factory, idKey: "supplier_id",
     category: "2. Supplier / Vendor Master Data",
-    desc: "Approved vendor panel. Single-source suppliers are the concentration risk that drives the resilience index.",
     writeRoles: [ADMIN, PROC], searchKeys: ["supplier_code", "supplier_name", "country"],
     columns: ["supplier_code", "supplier_name", "supplier_category", "country", "years_relationship", "internal_rating", "sourcing_type", "registration_status"],
     fields: [
@@ -433,7 +431,6 @@ const SCHEMA = {
   materials: {
     label: "Materials", icon: Package, idKey: "material_id",
     category: "3. Material / Equipment Master Data",
-    desc: "Equipment and material master with standard lead times — the baseline the AI model predicts slip against.",
     writeRoles: [ADMIN, PROC], searchKeys: ["material_code", "material_name", "manufacturer"],
     columns: ["material_code", "material_name", "category", "unit_of_measure", "standard_unit_cost", "standard_lead_time_days", "manufacturer", "country_of_origin"],
     fields: [
@@ -454,7 +451,6 @@ const SCHEMA = {
   purchase_orders: {
     label: "Purchase Orders", icon: ScrollText, idKey: "po_id",
     category: "4. Purchase Order Data",
-    desc: "Promised vs. actual delivery is the core training signal for delay prediction — the Slip column is that difference.",
     writeRoles: [ADMIN, PROC], searchKeys: ["po_number", "item_description"],
     columns: ["po_number", "item_description", "order_quantity", "order_value", "order_date", "promised_delivery_date", "_slip", "po_status"],
     fields: [
@@ -478,7 +474,6 @@ const SCHEMA = {
   shipments: {
     label: "Shipments", icon: Truck, idKey: "shipment_id",
     category: "5. Shipment / Logistics Data",
-    desc: "Transport legs with planned vs. actual arrival and documented delay reasons.",
     writeRoles: [ADMIN, PROC, SITE], searchKeys: ["shipment_number", "carrier_name", "destination_location"],
     columns: ["shipment_number", "origin_location", "destination_location", "transport_mode", "carrier_name", "dispatch_date", "planned_arrival_date", "shipment_status"],
     fields: [
@@ -500,7 +495,6 @@ const SCHEMA = {
   inspections: {
     label: "Inspections", icon: ClipboardCheck, idKey: "inspection_id",
     category: "6. Inspection / Quality Data",
-    desc: "Incoming, in-process, final and third-party inspection outcomes with rejection reasons and rework tracking.",
     writeRoles: [ADMIN, QC, SITE], searchKeys: ["batch_number", "inspector_name", "certificate_reference"],
     columns: ["batch_number", "inspection_date", "inspector_name", "inspector_role", "inspection_type", "result", "rework_required", "certificate_reference"],
     fields: [
@@ -521,7 +515,6 @@ const SCHEMA = {
   construction_activities: {
     label: "Site Activities", icon: HardHat, idKey: "activity_id",
     category: "7. Site / Construction Data",
-    desc: "Work packages with planned vs. actual dates, resource allocation, and recorded delay reasons.",
     writeRoles: [ADMIN, SITE], searchKeys: ["activity_name", "work_package"],
     columns: ["activity_name", "work_package", "planned_start_date", "planned_finish_date", "percent_complete", "delay_days", "status"],
     fields: [
@@ -543,7 +536,6 @@ const SCHEMA = {
   inventory: {
     label: "Inventory", icon: Warehouse, idKey: "inventory_id",
     category: "8. Inventory Data",
-    desc: "Stock levels against safety stock, with stock-out flags feeding the reorder logic.",
     writeRoles: [ADMIN, PROC, SITE], searchKeys: ["warehouse_location"],
     columns: ["warehouse_location", "current_stock_level", "safety_stock_level", "reorder_point", "reorder_quantity", "last_stock_check_date", "stock_out_flag"],
     fields: [
@@ -561,7 +553,6 @@ const SCHEMA = {
   costs: {
     label: "Costs", icon: IndianRupee, idKey: "cost_id",
     category: "9. Cost Data",
-    desc: "Budget vs. actual per category, with escalation and FX exposure on imported equipment.",
     writeRoles: [ADMIN, PROC], searchKeys: ["cost_category"],
     columns: ["cost_category", "budgeted_cost", "actual_cost", "cost_variance_pct", "escalation_pct", "recorded_date"],
     fields: [
@@ -579,7 +570,6 @@ const SCHEMA = {
   disruptions: {
     label: "Disruptions", icon: AlertTriangle, idKey: "disruption_id",
     category: "10. Disruption / Risk Incident History",
-    desc: "Past disruption events with impact in days and cost, plus the recovery action taken.",
     writeRoles: [ADMIN, PROC, SITE], searchKeys: ["disruption_type", "description"],
     columns: ["disruption_type", "event_date", "impact_days", "impact_cost", "severity", "status", "recovery_action"],
     fields: [
@@ -599,7 +589,6 @@ const SCHEMA = {
   carbon_records: {
     label: "Carbon Records", icon: Leaf, idKey: "carbon_id",
     category: "11. Carbon / Sustainability Data",
-    desc: "Emission factors by lifecycle stage, with data provenance and verification status.",
     writeRoles: [ADMIN, SUS], searchKeys: ["emission_source", "data_source"],
     columns: ["emission_source", "emission_factor_kgco2e_per_unit", "quantity", "calculated_emissions_kgco2e", "data_source", "verification_status", "recorded_date"],
     fields: [
@@ -620,7 +609,6 @@ const SCHEMA = {
   contractors: {
     label: "Contractors", icon: Users, idKey: "contractor_id",
     category: "12. Contractor Data",
-    desc: "Contractor panel with performance history, average delay, and safety incident record.",
     writeRoles: [ADMIN, PROC, SITE], searchKeys: ["contractor_code", "contractor_name", "region"],
     columns: ["contractor_code", "contractor_name", "scope_of_work", "region", "past_performance_rating", "avg_delay_days", "safety_incident_count", "certification_status"],
     fields: [
@@ -1035,8 +1023,7 @@ function ResourceScreen({ resourceKey, db, user, onCreate, onUpdate, onDelete })
   return (
     <>
       <Eyebrow>{cfg.category}</Eyebrow>
-      <h1 style={{ fontFamily: FD, fontSize: 25, fontWeight: 700, margin: "0 0 5px" }}>{cfg.label}</h1>
-      <p style={{ fontSize: 13.5, color: C.muted, margin: "0 0 22px", maxWidth: 700, lineHeight: 1.55 }}>{cfg.desc}</p>
+      <h1 style={{ fontFamily: FD, fontSize: 25, fontWeight: 700, margin: "0 0 22px" }}>{cfg.label}</h1>
 
       <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
         <div style={{ position: "relative", flex: "1 1 260px", maxWidth: 340 }}>
@@ -1203,13 +1190,9 @@ function Overview({ db, user, go }) {
   return (
     <>
       <Eyebrow>Decision-Support System</Eyebrow>
-      <h1 style={{ fontFamily: FD, fontSize: 25, fontWeight: 700, margin: "0 0 5px" }}>
+      <h1 style={{ fontFamily: FD, fontSize: 25, fontWeight: 700, margin: "0 0 24px" }}>
         Welcome back, {user.full_name.split(" ")[0]}
       </h1>
-      <p style={{ fontSize: 13.5, color: C.muted, margin: "0 0 24px", maxWidth: 700, lineHeight: 1.55 }}>
-        Twelve data categories feeding an AI forecasting layer. Everything below is live and editable —
-        create, edit and delete records and the figures update immediately.
-      </p>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 15, marginBottom: 30 }}>
         <KpiCard label="Active projects" value={db.projects.filter((p) => !["Commissioned", "Cancelled"].includes(p.project_status)).length}
@@ -1348,12 +1331,7 @@ function Forecasting({ db }) {
   return (
     <>
       <Eyebrow>AI Module — Demand &amp; Delay Forecasting</Eyebrow>
-      <h1 style={{ fontFamily: FD, fontSize: 25, fontWeight: 700, margin: "0 0 5px" }}>AI Forecasting</h1>
-      <p style={{ fontSize: 13.5, color: C.muted, margin: "0 0 24px", maxWidth: 720, lineHeight: 1.55 }}>
-        Random-forest delay prediction plus trend/seasonality demand forecasting. Trained on
-        {" "}{MODEL.meta.n_orders.toLocaleString()} synthetic orders calibrated to literature-reported
-        lead-time patterns — swap in real data and the model retrains without any UI change.
-      </p>
+      <h1 style={{ fontFamily: FD, fontSize: 25, fontWeight: 700, margin: "0 0 24px" }}>AI Forecasting</h1>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 15, marginBottom: 30 }}>
         <KpiCard label="Training records" value={MODEL.meta.n_orders.toLocaleString()} unit="orders" tone={C.cyan} />
@@ -1432,11 +1410,7 @@ function Forecasting({ db }) {
 
       {/* what-if */}
       <Eyebrow>Interactive</Eyebrow>
-      <h2 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, margin: "0 0 4px" }}>What-if delay estimator</h2>
-      <p style={{ fontSize: 13, color: C.muted, margin: "0 0 16px", maxWidth: 660, lineHeight: 1.55 }}>
-        Scored against the interpretable linear model, so every number here is explainable rather
-        than a black box. Move a control and the estimate updates instantly.
-      </p>
+      <h2 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, margin: "0 0 16px" }}>What-if delay estimator</h2>
       <div style={{
         background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 24,
         display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 26, marginBottom: 30,
