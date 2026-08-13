@@ -1,4 +1,7 @@
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:4000";
+// In production the backend serves the built frontend from the same origin,
+// so requests are relative. In dev (`vite`), the backend runs separately on
+// its own port, so default to that unless VITE_API_BASE overrides it.
+const API_BASE = import.meta.env.VITE_API_BASE || (import.meta.env.DEV ? "http://localhost:4000" : "");
 
 async function request(path, body) {
   const r = await fetch(`${API_BASE}${path}`, {

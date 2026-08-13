@@ -204,4 +204,10 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => console.log(`Auth backend listening on http://localhost:${PORT}`));
+const DIST_DIR = path.join(__dirname, "..", "dist");
+if (fs.existsSync(DIST_DIR)) {
+  app.use(express.static(DIST_DIR));
+  app.get(/^(?!\/api\/).*/, (req, res) => res.sendFile(path.join(DIST_DIR, "index.html")));
+}
+
+app.listen(PORT, () => console.log(`Server listening on http://localhost:${PORT}`));
