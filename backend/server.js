@@ -16,7 +16,10 @@ const DATA_FILE = path.join(__dirname, "data", "users.json");
 const PORT = process.env.PORT || 4000;
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "sayandeepvirat10@gmail.com";
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`;
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+const FRONTEND_URLS = (process.env.FRONTEND_URL || "http://localhost:5173")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const VALID_ROLES = ["admin", "procurement_manager", "site_engineer", "quality_inspector", "sustainability_officer", "viewer"];
 const ROLE_LABELS = {
@@ -67,7 +70,12 @@ const transporter = nodemailer.createTransport({
 });
 
 const app = express();
-app.use(cors({ origin: FRONTEND_URL }));
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || FRONTEND_URLS.includes(origin)) return callback(null, true);
+    callback(new Error("Not allowed by CORS"));
+  },
+}));
 app.use(express.json());
 
 function esc(s) {
