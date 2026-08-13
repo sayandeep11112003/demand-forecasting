@@ -853,7 +853,7 @@ function AuthScreen({ onLogin }) {
         <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 32 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 4 }}>
             <Zap size={20} color={C.copper} />
-            <span style={{ fontFamily: FD, fontWeight: 700, fontSize: 18 }}>Transmission SCM</span>
+            <span style={{ fontFamily: FD, fontWeight: 700, fontSize: 18 }}>Demand Forecasting</span>
           </div>
           <p style={{ color: C.muted, fontSize: 13, margin: "0 0 24px" }}>
             {mode === "login" ? "Sign in to the decision-support system." : "Create an account — an administrator must verify it before you can sign in."}
@@ -1600,7 +1600,7 @@ export default function App() {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 8px 18px", borderBottom: `1px solid ${C.borderSoft}`, marginBottom: 14 }}>
           <Zap size={18} color={C.copper} />
-          <span style={{ fontFamily: FD, fontWeight: 700, fontSize: 14.5 }}>Transmission SCM</span>
+          <span style={{ fontFamily: FD, fontWeight: 700, fontSize: 14.5 }}>Demand Forecasting</span>
         </div>
 
         <nav style={{ flex: 1, overflowY: "auto", marginRight: -6, paddingRight: 6 }}>

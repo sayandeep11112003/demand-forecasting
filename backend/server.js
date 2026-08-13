@@ -121,7 +121,7 @@ app.post("/api/auth/register", async (req, res) => {
     await transporter.sendMail({
       from: process.env.GMAIL_USER,
       to: ADMIN_EMAIL,
-      subject: `Transmission SCM: approve new account request`,
+      subject: `Demand Forecasting: approve new account request`,
       html: `
         <p>A new account is awaiting your approval.</p>
         <ul>
