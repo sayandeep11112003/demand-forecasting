@@ -1,22 +1,15 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
-import dns from "dns";
 import { fileURLToPath } from "url";
 
-dotenv.config();
-
-// Some hosts (e.g. Render) advertise IPv6 routes that aren't actually reachable,
-// which makes outbound SMTP to smtp.gmail.com hang/fail with ENETUNREACH when
-// Node picks the AAAA record first. Prefer IPv4 to avoid that.
-dns.setDefaultResultOrder("ipv4first");
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, ".env") });
+
 const DATA_FILE = path.join(__dirname, "data", "users.json");
 
 const PORT = process.env.PORT || 4000;
@@ -72,10 +65,22 @@ async function seedIfEmpty() {
 }
 await seedIfEmpty();
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
-});
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const RESEND_FROM = process.env.RESEND_FROM || "Demand Forecasting <onboarding@resend.dev>";
+
+async function sendMail({ to, subject, html }) {
+  const r = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ from: RESEND_FROM, to, subject, html }),
+  });
+  if (!r.ok) {
+    throw new Error(`Resend API error ${r.status}: ${await r.text()}`);
+  }
+}
 
 const app = express();
 app.use(cors({
@@ -134,8 +139,7 @@ app.post("/api/auth/register", async (req, res) => {
       created_at: new Date().toISOString(),
     };
     const verifyUrl = `${PUBLIC_BASE_URL}/api/auth/verify/${token}`;
-    await transporter.sendMail({
-      from: process.env.GMAIL_USER,
+    await sendMail({
       to: ADMIN_EMAIL,
       subject: `Demand Forecasting: approve new account request`,
       html: `
