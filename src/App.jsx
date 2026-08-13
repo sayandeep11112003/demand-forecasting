@@ -8,6 +8,7 @@ import {
   HardHat, Warehouse, IndianRupee, AlertTriangle, Leaf, Users, TrendingUp,
   Plus, Pencil, Trash2, X, LogOut, Search, Lock,
 } from "lucide-react";
+import { apiLogin, apiRegister } from "./api.js";
 
 /* ============================================================================
    TRAINED MODEL BUNDLE
@@ -68,15 +69,6 @@ const ROLES = {
   viewer: { label: "Viewer (read-only)", color: C.muted },
 };
 
-/* Tiny non-cryptographic hash. This exists only so the demo never holds a
-   plaintext password in state. Real password security is bcrypt on the server —
-   see backend/src/routes/auth.routes.js in the downloadable project. */
-function weakHash(str) {
-  let h = 5381;
-  for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) >>> 0;
-  return "h" + h.toString(36);
-}
-
 /* ============================================================================
    SEED DATA — all 12 categories
    ========================================================================== */
@@ -85,20 +77,6 @@ const CATS = MODEL.meta.categories;
 const REGIONS = MODEL.meta.regions;
 
 function buildDatabase() {
-  /* ---- users ---- */
-  const users = [
-    ["System Administrator", "admin@tscm.local", "admin", "IT"],
-    ["Priya Sharma", "priya@tscm.local", "procurement_manager", "Procurement"],
-    ["Arjun Mehta", "arjun@tscm.local", "site_engineer", "Construction"],
-    ["Kavya Reddy", "kavya@tscm.local", "quality_inspector", "Quality"],
-    ["Rohan Iyer", "rohan@tscm.local", "sustainability_officer", "Sustainability"],
-    ["Neha Gupta", "neha@tscm.local", "viewer", "Planning"],
-  ].map(([full_name, email, role, department]) => ({
-    user_id: uid("USR"), full_name, email, role, department,
-    password_hash: weakHash("demo1234"), is_active: true,
-    last_login_at: null, created_at: dateStr(2025, 3, 1),
-  }));
-
   /* ---- 1. projects ---- */
   const projTypes = ["Transmission Line", "Substation", "HVDC Converter Station", "Renewable Evacuation", "Grid Strengthening"];
   const projects = [
@@ -387,7 +365,7 @@ function buildDatabase() {
   construction_activities.forEach((a) => { a.contractor_id = pick(contractors).contractor_id; });
 
   return {
-    users, projects, suppliers, materials, purchase_orders, shipments, inspections,
+    projects, suppliers, materials, purchase_orders, shipments, inspections,
     construction_activities, inventory, costs, disruptions, carbon_records, contractors,
   };
 }
@@ -836,55 +814,71 @@ function EmptyState({ children }) {
 /* ============================================================================
    AUTH SCREEN
    ========================================================================== */
-function AuthScreen({ db, onLogin, onRegister }) {
+function AuthScreen({ onLogin }) {
   const [mode, setMode] = useState("login");
-  const [email, setEmail] = useState("admin@tscm.local");
-  const [password, setPassword] = useState("demo1234");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState("viewer");
   const [department, setDepartment] = useState("");
   const [err, setErr] = useState(null);
+  const [info, setInfo] = useState(null);
+  const [busy, setBusy] = useState(false);
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault();
     setErr(null);
+    setInfo(null);
     if (mode === "login") {
-      const u = db.users.find((x) => x.email.toLowerCase() === email.trim().toLowerCase());
-      if (!u) return setErr("No account found with that email.");
-      if (!u.is_active) return setErr("This account has been deactivated.");
-      if (u.password_hash !== weakHash(password)) return setErr("Incorrect password.");
-      onLogin(u);
+      setBusy(true);
+      try {
+        const u = await apiLogin({ email: email.trim(), password });
+        onLogin(u);
+      } catch (ex) {
+        setErr(ex.message);
+      } finally {
+        setBusy(false);
+      }
     } else {
       if (!fullName.trim()) return setErr("Full name is required.");
       if (password.length < 8) return setErr("Password must be at least 8 characters.");
-      if (db.users.some((x) => x.email.toLowerCase() === email.trim().toLowerCase()))
-        return setErr("An account with this email already exists.");
-      onRegister({
-        user_id: uid("USR"), full_name: fullName.trim(), email: email.trim().toLowerCase(),
-        role, department: department.trim() || "—", password_hash: weakHash(password),
-        is_active: true, last_login_at: null, created_at: new Date().toISOString().slice(0, 10),
-      });
+      setBusy(true);
+      try {
+        await apiRegister({
+          full_name: fullName.trim(), email: email.trim(), password, role,
+          department: department.trim() || "—",
+        });
+        setMode("login");
+        setPassword("");
+        setInfo("Registration submitted. An administrator has been sent a verification link and must approve this account before you can sign in.");
+      } catch (ex) {
+        setErr(ex.message);
+      } finally {
+        setBusy(false);
+      }
     }
   }
 
-  const demoAccounts = db.users.slice(0, 6);
-
   return (
     <div style={{ minHeight: "100vh", background: C.void, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: FB }}>
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,420px) minmax(0,330px)", gap: 20, maxWidth: 800, width: "100%" }}>
-        {/* form */}
+      <div style={{ maxWidth: 420, width: "100%" }}>
         <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 32 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 4 }}>
             <Zap size={20} color={C.copper} />
             <span style={{ fontFamily: FD, fontWeight: 700, fontSize: 18 }}>Transmission SCM</span>
           </div>
           <p style={{ color: C.muted, fontSize: 13, margin: "0 0 24px" }}>
-            {mode === "login" ? "Sign in to the decision-support system." : "Create an account — your role sets what you can edit."}
+            {mode === "login" ? "Sign in to the decision-support system." : "Create an account — an administrator must verify it before you can sign in."}
           </p>
 
           {err && (
             <div style={{ background: `${C.red}1F`, border: `1px solid ${C.red}66`, color: C.red, borderRadius: 8, padding: "10px 13px", fontSize: 12.5, marginBottom: 16 }}>
               {err}
+            </div>
+          )}
+          {info && (
+            <div style={{ background: `${C.green}1F`, border: `1px solid ${C.green}66`, color: C.green, borderRadius: 8, padding: "10px 13px", fontSize: 12.5, marginBottom: 16, lineHeight: 1.5 }}>
+              {info}
             </div>
           )}
 
@@ -912,42 +906,17 @@ function AuthScreen({ db, onLogin, onRegister }) {
                 </Field>
               </div>
             )}
-            <Btn type="submit" variant="primary" style={{ width: "100%", justifyContent: "center", marginTop: 4 }}>
-              {mode === "login" ? "Sign in" : "Create account"}
+            <Btn type="submit" variant="primary" disabled={busy} style={{ width: "100%", justifyContent: "center", marginTop: 4 }}>
+              {busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
             </Btn>
           </form>
 
           <div style={{ marginTop: 18, fontSize: 12.5, color: C.muted, textAlign: "center" }}>
             {mode === "login" ? "No account? " : "Already registered? "}
-            <button onClick={() => { setMode(mode === "login" ? "register" : "login"); setErr(null); }}
+            <button onClick={() => { setMode(mode === "login" ? "register" : "login"); setErr(null); setInfo(null); }}
               style={{ background: "none", border: "none", color: C.copper, cursor: "pointer", fontSize: 12.5, padding: 0, fontWeight: 600 }}>
               {mode === "login" ? "Register" : "Sign in"}
             </button>
-          </div>
-        </div>
-
-        {/* demo accounts */}
-        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 24 }}>
-          <Eyebrow>Demo accounts</Eyebrow>
-          <p style={{ fontSize: 12, color: C.muted, margin: "0 0 14px", lineHeight: 1.5 }}>
-            Click any account to load it. Every password is <span style={{ fontFamily: FM, color: C.text }}>demo1234</span>.
-          </p>
-          <div style={{ display: "grid", gap: 7 }}>
-            {demoAccounts.map((u) => (
-              <button key={u.user_id} onClick={() => { setEmail(u.email); setPassword("demo1234"); setMode("login"); setErr(null); }}
-                style={{
-                  textAlign: "left", background: C.panel2, border: `1px solid ${C.border}`, borderRadius: 8,
-                  padding: "9px 11px", cursor: "pointer", color: C.text, fontFamily: FB,
-                }}>
-                <div style={{ fontSize: 12.5, fontWeight: 600 }}>{u.full_name}</div>
-                <div style={{ fontFamily: FM, fontSize: 10, color: ROLES[u.role].color, marginTop: 2 }}>
-                  {ROLES[u.role].label}
-                </div>
-              </button>
-            ))}
-          </div>
-          <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${C.borderSoft}`, fontSize: 11, color: C.faint, lineHeight: 1.55 }}>
-            Roles change what you can edit — sign in as Viewer to see write actions disappear.
           </div>
         </div>
       </div>
@@ -1624,16 +1593,7 @@ export default function App() {
 
   if (!user) {
     return (
-      <AuthScreen db={db}
-        onLogin={(u) => {
-          setDb((d) => ({
-            ...d,
-            users: d.users.map((x) => x.user_id === u.user_id ? { ...x, last_login_at: new Date().toISOString() } : x),
-          }));
-          setUser(u); setRoute("overview");
-        }}
-        onRegister={(u) => { setDb((d) => ({ ...d, users: [...d.users, u] })); setUser(u); setRoute("overview"); }}
-      />
+      <AuthScreen onLogin={(u) => { setUser(u); setRoute("overview"); }} />
     );
   }
 
