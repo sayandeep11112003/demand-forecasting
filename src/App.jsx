@@ -825,6 +825,10 @@ function SupplyChainBackdrop() {
         @keyframes scmCloud2 { 0% { transform: translateX(-10%); } 100% { transform: translateX(115%); } }
         @keyframes scmHook { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(14px); } }
         @keyframes scmRise { 0% { transform: translateY(0); opacity: 0; } 12% { opacity: .8; } 85% { opacity: .5; } 100% { transform: translateY(-560px); opacity: 0; } }
+        @keyframes scmSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes scmTrain { 0% { transform: translateX(-25%); } 100% { transform: translateX(125%); } }
+        @keyframes scmFlock { 0% { transform: translateX(-8%) translateY(0); } 50% { transform: translateX(55%) translateY(-14px); } 100% { transform: translateX(112%) translateY(0); } }
+        @keyframes scmGlow { 0%, 100% { opacity: .5; r: 46; } 50% { opacity: .75; r: 52; } }
         .scm-truck-a { animation: scmDrive 26s linear infinite; }
         .scm-truck-b { animation: scmDriveB 34s linear infinite; animation-delay: -14s; }
         .scm-ship { animation: scmDrift 70s ease-in-out infinite alternate; }
@@ -835,6 +839,11 @@ function SupplyChainBackdrop() {
         .scm-plane { animation: scmCloud1 48s linear infinite; animation-delay: -18s; }
         .scm-hook { animation: scmHook 3.2s ease-in-out infinite; }
         .scm-particle { animation: scmRise linear infinite; }
+        .scm-blades { animation: scmSpin 6s linear infinite; transform-box: fill-box; transform-origin: center; }
+        .scm-blades-b { animation: scmSpin 7.5s linear infinite; transform-box: fill-box; transform-origin: center; }
+        .scm-train { animation: scmTrain 40s linear infinite; }
+        .scm-flock { animation: scmFlock 30s ease-in-out infinite; }
+        .scm-glow { animation: scmGlow 4s ease-in-out infinite; }
       `}</style>
       <svg viewBox="0 0 1200 700" preserveAspectRatio="xMidYMax slice" style={{ width: "100%", height: "100%", display: "block" }}>
         <defs>
@@ -850,6 +859,36 @@ function SupplyChainBackdrop() {
         </defs>
 
         <rect width="1200" height="700" fill="url(#scmSky)" />
+
+        {/* soft sun glow */}
+        <circle className="scm-glow" cx="1000" cy="130" r="46" fill="#F3C388" opacity="0.5" />
+        <circle cx="1000" cy="130" r="22" fill="#F7D9A8" opacity="0.8" />
+
+        {/* distant hills for depth */}
+        <path d="M0,420 Q120,370 260,410 T520,400 T780,415 T1050,395 L1200,420 L1200,470 L0,470 Z" fill="#D3DFEA" opacity="0.55" />
+
+        {/* wind turbines on the hills */}
+        {[[210, 372, 1], [1140, 368, -1]].map(([x, y, dir], i) => (
+          <g key={`turbine-${i}`} opacity="0.65">
+            <line x1={x} y1={y} x2={x} y2={y + 58} stroke="#9AAABE" strokeWidth="2.5" />
+            <g transform={`translate(${x},${y})`}>
+              <g className={i === 0 ? "scm-blades" : "scm-blades-b"}>
+                <rect x="-1.6" y="-30" width="3.2" height="30" rx="1.6" fill="#8698AD" />
+                <rect x="-1.6" y="-30" width="3.2" height="30" rx="1.6" fill="#8698AD" transform="rotate(120)" />
+                <rect x="-1.6" y="-30" width="3.2" height="30" rx="1.6" fill="#8698AD" transform="rotate(240)" />
+              </g>
+              <circle r="2.4" fill="#7C8CA0" />
+            </g>
+          </g>
+        ))}
+
+        {/* migrating bird flock */}
+        <g className="scm-flock" opacity="0.5">
+          {[[0, 0], [18, 7], [-18, 7], [34, 15], [-34, 15]].map(([dx, dy], i) => (
+            <path key={i} d={`M${300 + dx - 7},${60 + dy + 3} L${300 + dx},${60 + dy - 3} L${300 + dx + 7},${60 + dy + 3}`}
+              fill="none" stroke="#7C8CA0" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          ))}
+        </g>
 
         {/* drifting clouds */}
         <g className="scm-cloud-a" opacity="0.55">
@@ -912,6 +951,20 @@ function SupplyChainBackdrop() {
           </g>
         ))}
 
+        {/* freight train on an elevated track */}
+        <line x1="0" y1="452" x2="1200" y2="452" stroke="#AEBBCB" strokeWidth="1.5" opacity="0.6" />
+        <line x1="0" y1="456" x2="1200" y2="456" stroke="#AEBBCB" strokeWidth="1.5" opacity="0.6" />
+        <line x1="0" y1="453.5" x2="1200" y2="453.5" stroke="#C3CEDB" strokeWidth="6" strokeDasharray="3 14" opacity="0.5" />
+        <g className="scm-train" opacity="0.7">
+          {[0, 46, 92].map((dx, i) => (
+            <g key={i} transform={`translate(${dx},428)`}>
+              <rect x="0" y="0" width="38" height="22" rx="2" fill={i === 0 ? "#7C8CA0" : "#C1793C"} />
+              <circle cx="9" cy="24" r="3.4" fill="#5B6675" />
+              <circle cx="29" cy="24" r="3.4" fill="#5B6675" />
+            </g>
+          ))}
+        </g>
+
         {/* container ship on the water */}
         <rect x="0" y="470" width="1200" height="230" fill="url(#scmWater)" />
         <g className="scm-ship" opacity="0.85">
@@ -952,6 +1005,13 @@ function SupplyChainBackdrop() {
             <rect x="32" y="6" width="16" height="12" rx="2" fill="#7C8CA0" />
             <circle cx="10" cy="20" r="4" fill="#F7FAFD" stroke="#7C8CA0" />
             <circle cx="38" cy="20" r="4" fill="#F7FAFD" stroke="#7C8CA0" />
+          </g>
+        </g>
+        <g className="scm-truck-a" style={{ animationDuration: "20s", animationDelay: "-6s" }}>
+          <g transform="translate(0,570) scale(0.6)">
+            <rect x="0" y="0" width="34" height="16" rx="4" fill="#2694AE" />
+            <circle cx="9" cy="19" r="3.6" fill="#F7FAFD" stroke="#7C8CA0" />
+            <circle cx="25" cy="19" r="3.6" fill="#F7FAFD" stroke="#7C8CA0" />
           </g>
         </g>
 
