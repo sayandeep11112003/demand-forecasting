@@ -1,11 +1,11 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import {
   ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Cell, LabelList,
 } from "recharts";
 import {
   Zap, LayoutGrid, FolderKanban, Factory, ScrollText, Package, Truck, ClipboardCheck,
-  HardHat, Warehouse, IndianRupee, AlertTriangle, Leaf, Users, TrendingUp,
+  HardHat, Warehouse, IndianRupee, AlertTriangle, Leaf, Users, TrendingUp, Activity,
   Plus, Pencil, Trash2, X, LogOut, Search, Lock,
 } from "lucide-react";
 import { apiLogin, apiRegister } from "./api.js";
@@ -656,6 +656,79 @@ const num = (v) => v == null ? "—" : Number(v).toLocaleString("en-IN", { maxim
 
 function daysBetween(a, b) {
   return Math.round((new Date(b + "T00:00:00Z") - new Date(a + "T00:00:00Z")) / 86400000);
+}
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/* ============================================================================
+   REAL-TIME ANOMALY DETECTION — ISOLATION FOREST
+   Standard algorithm (Liu, Ting & Zhou, 2008): build an ensemble of random
+   binary trees that isolate points via random feature/split choices; points
+   that isolate in fewer splits (shorter average path length) are more
+   anomalous. Runs entirely client-side against whatever records are in `db`
+   right now — point it at a live event feed instead of the seeded demo data
+   and the scoring logic is unchanged.
+   ========================================================================== */
+function isoCFactor(n) {
+  if (n <= 1) return 1;
+  return 2 * (Math.log(n - 1) + 0.5772156649015329) - (2 * (n - 1)) / n;
+}
+
+function isoBuildTree(data, height, heightLimit) {
+  const n = data.length;
+  if (height >= heightLimit || n <= 1) return { external: true, size: n };
+
+  const numFeatures = data[0].length;
+  const feature = Math.floor(Math.random() * numFeatures);
+  let min = Infinity, max = -Infinity;
+  for (const row of data) {
+    const v = row[feature];
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
+  if (min === max) return { external: true, size: n };
+
+  const splitValue = min + Math.random() * (max - min);
+  const left = data.filter((row) => row[feature] < splitValue);
+  const right = data.filter((row) => row[feature] >= splitValue);
+  return {
+    external: false, feature, splitValue,
+    left: isoBuildTree(left, height + 1, heightLimit),
+    right: isoBuildTree(right, height + 1, heightLimit),
+  };
+}
+
+function isoPathLength(node, point, height = 0) {
+  if (node.external) return height + isoCFactor(node.size);
+  return point[node.feature] < node.splitValue
+    ? isoPathLength(node.left, point, height + 1)
+    : isoPathLength(node.right, point, height + 1);
+}
+
+function isolationForestScores(vectors, { nTrees = 100, sampleSize = 256 } = {}) {
+  if (vectors.length < 2) return vectors.map(() => 0);
+  const n = Math.min(sampleSize, vectors.length);
+  const heightLimit = Math.ceil(Math.log2(Math.max(n, 2)));
+  const c = isoCFactor(n);
+
+  const trees = [];
+  for (let t = 0; t < nTrees; t++) {
+    const sample = [];
+    const pool = vectors.slice();
+    for (let i = 0; i < n; i++) {
+      const idx = Math.floor(Math.random() * pool.length);
+      sample.push(pool[idx]);
+      pool.splice(idx, 1);
+    }
+    trees.push(isoBuildTree(sample, 0, heightLimit));
+  }
+
+  return vectors.map((point) => {
+    const avgPath = trees.reduce((s, tree) => s + isoPathLength(tree, point), 0) / trees.length;
+    return Math.pow(2, -avgPath / c); // (0,1] — closer to 1 is more anomalous
+  });
 }
 
 const STATUS_TONE = {
@@ -1776,6 +1849,163 @@ function Forecasting({ db }) {
 }
 
 /* ============================================================================
+   LIVE MONITORING — anomaly feed built on the isolation forest above
+   ========================================================================== */
+function buildAnomalyFeed(db) {
+  const poById = new Map(db.purchase_orders.map((p) => [p.po_id, p]));
+  const supplierById = new Map(db.suppliers.map((s) => [s.supplier_id, s]));
+  const projectById = new Map(db.projects.map((p) => [p.project_id, p]));
+  const today = todayISO();
+
+  const shipmentRows = db.shipments
+    .filter((s) => s.dispatch_date && s.planned_arrival_date)
+    .map((s) => {
+      const plannedTransit = daysBetween(s.dispatch_date, s.planned_arrival_date);
+      const timing = s.actual_arrival_date
+        ? daysBetween(s.planned_arrival_date, s.actual_arrival_date)
+        : daysBetween(s.planned_arrival_date, today);
+      return { record: s, kind: "shipments", timing, vector: [s.distance_km || 0, plannedTransit, timing] };
+    });
+
+  const poRows = db.purchase_orders
+    .filter((p) => p.promised_delivery_date)
+    .map((p) => {
+      const timing = p.actual_delivery_date
+        ? daysBetween(p.promised_delivery_date, p.actual_delivery_date)
+        : daysBetween(p.promised_delivery_date, today);
+      return { record: p, kind: "purchase_orders", timing, vector: [p.order_value || 0, p.order_quantity || 0, timing] };
+    });
+
+  const scoreGroup = (rows) => {
+    if (rows.length < 8) return rows.map((r) => ({ ...r, score: 0 }));
+    const scores = isolationForestScores(rows.map((r) => r.vector), { nTrees: 80, sampleSize: Math.min(128, rows.length) });
+    return rows.map((r, i) => ({ ...r, score: scores[i] }));
+  };
+
+  return [...scoreGroup(shipmentRows), ...scoreGroup(poRows)]
+    .filter((row) => row.score > 0.55)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 10)
+    .map((row) => {
+      const { record, kind, timing, score } = row;
+      let title, detail, supplier, project;
+      if (kind === "shipments") {
+        const po = record.po_id ? poById.get(record.po_id) : null;
+        supplier = po ? supplierById.get(po.supplier_id) : null;
+        project = po ? projectById.get(po.project_id) : null;
+        title = record.shipment_number;
+        detail = timing > 0
+          ? `${timing}d behind schedule over ${num(record.distance_km)} km (${record.transport_mode})`
+          : timing < 0
+            ? `${Math.abs(timing)}d ahead of schedule over ${num(record.distance_km)} km (${record.transport_mode})`
+            : `Flagged on distance/mode profile · ${num(record.distance_km)} km (${record.transport_mode})`;
+      } else {
+        supplier = supplierById.get(record.supplier_id);
+        project = projectById.get(record.project_id);
+        title = record.po_number;
+        detail = timing > 0
+          ? `${timing}d overdue · ${inr(record.order_value)} · qty ${num(record.order_quantity)}`
+          : `Unusual order profile · ${inr(record.order_value)} · qty ${num(record.order_quantity)}`;
+      }
+      return {
+        id: `${kind}:${record[kind === "shipments" ? "shipment_id" : "po_id"]}`,
+        kind, record, score, timing, title, detail, supplier, project,
+      };
+    });
+}
+
+function Monitoring({ db, user, onCreate, onSimulateEvent }) {
+  const [tick, setTick] = useState(0);
+  const [loggedIds, setLoggedIds] = useState(() => new Set());
+
+  useEffect(() => {
+    const rescoreTimer = setInterval(() => setTick((t) => t + 1), 4000);
+    const eventTimer = setInterval(() => onSimulateEvent(), 9000);
+    return () => { clearInterval(rescoreTimer); clearInterval(eventTimer); };
+  }, [onSimulateEvent]);
+
+  const anomalies = useMemo(() => buildAnomalyFeed(db), [db, tick]);
+  const canRespond = SCHEMA.disruptions.writeRoles.includes(user.role);
+
+  function respond(a) {
+    const severity = a.score >= 0.75 ? "Critical" : a.score >= 0.65 ? "High" : "Medium";
+    onCreate("disruptions", {
+      project_id: a.project?.project_id || null,
+      supplier_id: a.supplier?.supplier_id || null,
+      disruption_type: a.kind === "shipments" ? "Transport Delay" : "Supplier Failure",
+      event_date: todayISO(),
+      description: `Auto-flagged by anomaly monitor: ${a.title} — ${a.detail} (isolation score ${a.score.toFixed(2)})`,
+      impact_days: Math.max(a.timing, 0),
+      impact_cost: a.kind === "purchase_orders" ? Math.round((a.record.order_value || 0) * 0.02) : 0,
+      severity,
+      recovery_action: "",
+      recovery_completed_date: null,
+      status: "Open",
+    });
+    setLoggedIds((s) => new Set(s).add(a.id));
+  }
+
+  return (
+    <>
+      <Eyebrow>Real-Time Monitoring — Isolation Forest</Eyebrow>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 4 }}>
+        <h1 style={{ fontFamily: FD, fontSize: 25, fontWeight: 700, margin: 0 }}>Anomaly Watch</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: C.green, animation: "pulse 2s infinite" }} />
+          <span style={{ fontFamily: FM, fontSize: 10.5, color: C.green, letterSpacing: ".05em" }}>LIVE · RESCORING EVERY 4S</span>
+        </div>
+      </div>
+      <p style={{ fontSize: 13.5, color: C.muted, margin: "8px 0 22px", maxWidth: 780, lineHeight: 1.55 }}>
+        A real isolation-forest ensemble (80–100 random trees, Liu/Ting/Zhou 2008) scores every open shipment and
+        purchase order on value, distance and schedule deviation — live, in your browser. Simulated delivery
+        events feed in every few seconds to mimic a real event stream; point this at an actual PO/shipment feed
+        and the scoring is unchanged.
+      </p>
+
+      {anomalies.length === 0 ? (
+        <EmptyState>No anomalies above threshold right now — the monitor is still watching.</EmptyState>
+      ) : (
+        <div style={{ display: "grid", gap: 10 }}>
+          {anomalies.map((a) => {
+            const severity = a.score >= 0.75 ? "Critical" : a.score >= 0.65 ? "High" : "Medium";
+            const tone = severity === "Critical" ? C.red : severity === "High" ? C.amber : C.cyan;
+            const logged = loggedIds.has(a.id);
+            return (
+              <div key={a.id} style={{
+                display: "flex", alignItems: "center", gap: 14, background: C.panel, border: `1px solid ${C.border}`,
+                borderLeft: `3px solid ${tone}`, borderRadius: 10, padding: "13px 16px", flexWrap: "wrap",
+              }}>
+                <div style={{ width: 54, textAlign: "center" }}>
+                  <div style={{ fontFamily: FM, fontSize: 15, fontWeight: 700, color: tone }}>{Math.round(a.score * 100)}</div>
+                  <div style={{ fontFamily: FM, fontSize: 8.5, color: C.faint, textTransform: "uppercase" }}>score</div>
+                </div>
+                <div style={{ flex: 1, minWidth: 220 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2, flexWrap: "wrap" }}>
+                    <span style={{ fontFamily: FM, fontSize: 12.5, fontWeight: 600 }}>{a.title}</span>
+                    <Pill value={severity} />
+                    <span style={{ fontFamily: FM, fontSize: 10, color: C.faint }}>
+                      {a.kind === "shipments" ? "Shipment" : "Purchase Order"}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 12, color: C.muted }}>
+                    {a.detail}{a.supplier ? ` · ${a.supplier.supplier_name}` : ""}{a.project ? ` · ${a.project.project_name}` : ""}
+                  </div>
+                </div>
+                {canRespond && (
+                  <Btn size="sm" variant={logged ? "ghost" : "primary"} disabled={logged} onClick={() => respond(a)}>
+                    {logged ? "Logged ✓" : "Log as disruption"}
+                  </Btn>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ============================================================================
    ROOT APP
    ========================================================================== */
 export default function App() {
@@ -1816,6 +2046,24 @@ export default function App() {
     flash("Record deleted.");
   }, [flash]);
 
+  /* Simulated event feed for the live monitor — stands in for a real PO/shipment
+     event stream. Deliberately silent (no toast) since it fires every few
+     seconds; the isolation forest reacting to it is the point, not the write. */
+  const simulateLiveEvent = useCallback(() => {
+    setDb((d) => {
+      const pool = d.shipments.filter((s) => s.shipment_status !== "Delivered");
+      if (!pool.length) return d;
+      const pick = pool[Math.floor(Math.random() * pool.length)];
+      const jitter = Math.round((Math.random() - 0.35) * 24);
+      return {
+        ...d,
+        shipments: d.shipments.map((s) => s.shipment_id === pick.shipment_id
+          ? { ...s, shipment_status: "Delivered", actual_arrival_date: addDays(s.planned_arrival_date || s.dispatch_date, jitter) }
+          : s),
+      };
+    });
+  }, []);
+
   if (!user) {
     return (
       <AuthScreen onLogin={(u) => { setUser(u); setRoute("overview"); }} />
@@ -1826,6 +2074,7 @@ export default function App() {
     { key: "overview", label: "Overview", Icon: LayoutGrid },
     ...Object.keys(SCHEMA).map((k) => ({ key: k, label: SCHEMA[k].label, Icon: SCHEMA[k].icon })),
     { key: "forecasting", label: "AI Forecasting", Icon: TrendingUp },
+    { key: "monitoring", label: "Live Monitoring", Icon: Activity },
   ];
 
   return (
@@ -1902,6 +2151,9 @@ export default function App() {
         <div style={{ flex: 1, padding: 26, maxWidth: 1380, width: "100%", margin: "0 auto" }}>
           {route === "overview" && <Overview db={db} user={user} go={setRoute} />}
           {route === "forecasting" && <Forecasting db={db} />}
+          {route === "monitoring" && (
+            <Monitoring db={db} user={user} onCreate={createRecord} onSimulateEvent={simulateLiveEvent} />
+          )}
           {SCHEMA[route] && (
             <ResourceScreen resourceKey={route} db={db} user={user}
               onCreate={createRecord} onUpdate={updateRecord} onDelete={deleteRecord} />
