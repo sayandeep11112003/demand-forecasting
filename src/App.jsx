@@ -802,6 +802,120 @@ function EmptyState({ children }) {
 /* ============================================================================
    AUTH SCREEN
    ========================================================================== */
+function SupplyChainBackdrop() {
+  const towerX = [70, 330, 590, 850, 1110];
+  return (
+    <div style={{ position: "absolute", inset: 0, overflow: "hidden", zIndex: 0 }}>
+      <style>{`
+        @keyframes scmDrive { 0% { transform: translateX(-20%); } 100% { transform: translateX(120%); } }
+        @keyframes scmDriveB { 0% { transform: translateX(-20%); } 100% { transform: translateX(120%); } }
+        @keyframes scmDrift { 0% { transform: translateX(0); } 100% { transform: translateX(-140px); } }
+        @keyframes scmPulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+        @keyframes scmBlink { 0%, 100% { opacity: .3; } 50% { opacity: .85; } }
+        .scm-truck-a { animation: scmDrive 26s linear infinite; }
+        .scm-truck-b { animation: scmDriveB 34s linear infinite; animation-delay: -14s; }
+        .scm-ship { animation: scmDrift 70s ease-in-out infinite alternate; }
+        .scm-node { animation: scmPulse 2.6s ease-in-out infinite; }
+        .scm-win { animation: scmBlink 4s ease-in-out infinite; }
+      `}</style>
+      <svg viewBox="0 0 1200 700" preserveAspectRatio="xMidYMax slice" style={{ width: "100%", height: "100%", display: "block" }}>
+        <defs>
+          <linearGradient id="scmSky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#0B0F16" />
+            <stop offset="55%" stopColor="#121A24" />
+            <stop offset="100%" stopColor="#0A0E14" />
+          </linearGradient>
+          <linearGradient id="scmWater" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#132029" />
+            <stop offset="100%" stopColor="#0A1218" />
+          </linearGradient>
+        </defs>
+
+        <rect width="1200" height="700" fill="url(#scmSky)" />
+
+        {/* distant warehouse / port skyline */}
+        {[
+          [40, 480, 90, 90], [150, 500, 60, 70], [960, 470, 100, 100], [1080, 495, 70, 75],
+        ].map(([x, y, w, h], i) => (
+          <g key={`bldg-${i}`} opacity="0.35">
+            <rect x={x} y={y} width={w} height={h} fill="#1B222C" />
+            {Array.from({ length: 4 }).map((_, r) =>
+              Array.from({ length: 3 }).map((__, c) => (
+                <rect key={`${i}-${r}-${c}`} className="scm-win" x={x + 8 + c * (w / 3)} y={y + 10 + r * (h / 5)}
+                  width={w / 3 - 10} height={h / 8} fill="#E0A458"
+                  style={{ animationDelay: `${(r * 3 + c) * 0.4}s` }} />
+              ))
+            )}
+          </g>
+        ))}
+
+        {/* transmission towers with flowing current */}
+        {towerX.slice(0, -1).map((x, i) => {
+          const x2 = towerX[i + 1];
+          const upperPath = `M${x + 34},300 Q${(x + x2) / 2},280 ${x2 - 34},300`;
+          const lowerPath = `M${x + 28},340 Q${(x + x2) / 2},322 ${x2 - 28},340`;
+          return (
+            <g key={`span-${i}`}>
+              <path d={upperPath} stroke="#3A4657" strokeWidth="1.5" fill="none" opacity="0.7" />
+              <path d={lowerPath} stroke="#3A4657" strokeWidth="1.5" fill="none" opacity="0.7" />
+              <circle r="3.2" fill="#5AB2C9" className="scm-node">
+                <animateMotion dur={`${5 + i}s`} repeatCount="indefinite" path={upperPath} />
+              </circle>
+              <circle r="3.2" fill="#CD8B4F" className="scm-node" style={{ animationDelay: "1.2s" }}>
+                <animateMotion dur={`${6 + i}s`} repeatCount="indefinite" path={lowerPath} />
+              </circle>
+            </g>
+          );
+        })}
+        {towerX.map((x, i) => (
+          <g key={`tower-${i}`} opacity="0.85">
+            <path d={`M${x - 40},430 L${x - 14},300 L${x + 14},300 L${x + 40},430 Z`} fill="none" stroke="#3A4657" strokeWidth="2" />
+            <line x1={x - 34} y1="340" x2={x + 34} y2="340" stroke="#3A4657" strokeWidth="2" />
+            <line x1={x - 20} y1="385" x2={x + 20} y2="385" stroke="#3A4657" strokeWidth="2" />
+            <line x1={x - 40} y1="430" x2={x + 40} y2="430" stroke="#3A4657" strokeWidth="2" />
+            <line x1={x} y1="300" x2={x} y2="430" stroke="#2A3341" strokeWidth="1.5" />
+          </g>
+        ))}
+
+        {/* container ship on the water */}
+        <rect x="0" y="470" width="1200" height="230" fill="url(#scmWater)" />
+        <g className="scm-ship" opacity="0.8">
+          <path d="M540,500 L860,500 L830,536 L570,536 Z" fill="#1B222C" stroke="#2A3341" />
+          {[560, 610, 660, 710, 760].map((cx, i) => (
+            <rect key={i} x={cx} y="474" width="42" height="24"
+              fill={i % 2 === 0 ? "#8F6338" : "#232B37"} stroke="#0D1117" strokeWidth="1" />
+          ))}
+        </g>
+
+        {/* road with moving trucks */}
+        <rect x="0" y="560" width="1200" height="46" fill="#151B23" opacity="0.9" />
+        <line x1="0" y1="583" x2="1200" y2="583" stroke="#5B6675" strokeWidth="2" strokeDasharray="26 20" opacity="0.4" />
+
+        <g className="scm-truck-a">
+          <g transform="translate(0,566)">
+            <rect x="0" y="0" width="30" height="18" rx="2" fill="#8A95A6" />
+            <rect x="32" y="6" width="16" height="12" rx="2" fill="#5AB2C9" />
+            <circle cx="10" cy="20" r="4" fill="#0D1117" stroke="#5B6675" />
+            <circle cx="38" cy="20" r="4" fill="#0D1117" stroke="#5B6675" />
+          </g>
+        </g>
+        <g className="scm-truck-b">
+          <g transform="translate(0,572) scale(0.8)">
+            <rect x="0" y="0" width="30" height="18" rx="2" fill="#CD8B4F" />
+            <rect x="32" y="6" width="16" height="12" rx="2" fill="#8A95A6" />
+            <circle cx="10" cy="20" r="4" fill="#0D1117" stroke="#5B6675" />
+            <circle cx="38" cy="20" r="4" fill="#0D1117" stroke="#5B6675" />
+          </g>
+        </g>
+      </svg>
+      <div style={{
+        position: "absolute", inset: 0,
+        background: "linear-gradient(115deg, rgba(10,14,20,.92) 0%, rgba(10,14,20,.72) 38%, rgba(10,14,20,.5) 62%, rgba(10,14,20,.85) 100%)",
+      }} />
+    </div>
+  );
+}
+
 function AuthScreen({ onLogin }) {
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
@@ -848,9 +962,10 @@ function AuthScreen({ onLogin }) {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: C.void, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: FB }}>
-      <div style={{ maxWidth: 420, width: "100%" }}>
-        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 32 }}>
+    <div style={{ position: "relative", minHeight: "100vh", background: C.void, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: FB, overflow: "hidden" }}>
+      <SupplyChainBackdrop />
+      <div style={{ position: "relative", zIndex: 1, maxWidth: 420, width: "100%" }}>
+        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 32, boxShadow: "0 30px 70px rgba(0,0,0,.55)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 4 }}>
             <Zap size={20} color={C.copper} />
             <span style={{ fontFamily: FD, fontWeight: 700, fontSize: 18 }}>Demand Forecasting</span>
