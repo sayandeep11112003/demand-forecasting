@@ -802,6 +802,15 @@ function EmptyState({ children }) {
 /* ============================================================================
    AUTH SCREEN
    ========================================================================== */
+/* Light palette used only on the login/register screen — the rest of the
+   app stays on the dark "Grid Current" theme (C) defined above. */
+const LC = {
+  text: "#1E2733", muted: "#64748B", faint: "#94A3B8",
+  card: "#FFFFFF", cardBorder: "#E2E8F0",
+  inputBg: "#F8FAFC", inputBorder: "#DCE3EC",
+  copper: "#C1793C", cyan: "#2694AE", green: "#2F9E6E", red: "#D8524A",
+};
+
 function SupplyChainBackdrop() {
   const towerX = [70, 330, 590, 850, 1110];
   return (
@@ -821,13 +830,13 @@ function SupplyChainBackdrop() {
       <svg viewBox="0 0 1200 700" preserveAspectRatio="xMidYMax slice" style={{ width: "100%", height: "100%", display: "block" }}>
         <defs>
           <linearGradient id="scmSky" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#0B0F16" />
-            <stop offset="55%" stopColor="#121A24" />
-            <stop offset="100%" stopColor="#0A0E14" />
+            <stop offset="0%" stopColor="#F7FAFD" />
+            <stop offset="55%" stopColor="#EAF1F8" />
+            <stop offset="100%" stopColor="#DCE6F0" />
           </linearGradient>
           <linearGradient id="scmWater" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#132029" />
-            <stop offset="100%" stopColor="#0A1218" />
+            <stop offset="0%" stopColor="#D8E7F1" />
+            <stop offset="100%" stopColor="#C2D6E5" />
           </linearGradient>
         </defs>
 
@@ -837,12 +846,12 @@ function SupplyChainBackdrop() {
         {[
           [40, 480, 90, 90], [150, 500, 60, 70], [960, 470, 100, 100], [1080, 495, 70, 75],
         ].map(([x, y, w, h], i) => (
-          <g key={`bldg-${i}`} opacity="0.35">
-            <rect x={x} y={y} width={w} height={h} fill="#1B222C" />
+          <g key={`bldg-${i}`} opacity="0.4">
+            <rect x={x} y={y} width={w} height={h} fill="#C3D0DE" />
             {Array.from({ length: 4 }).map((_, r) =>
               Array.from({ length: 3 }).map((__, c) => (
                 <rect key={`${i}-${r}-${c}`} className="scm-win" x={x + 8 + c * (w / 3)} y={y + 10 + r * (h / 5)}
-                  width={w / 3 - 10} height={h / 8} fill="#E0A458"
+                  width={w / 3 - 10} height={h / 8} fill="#E8935A"
                   style={{ animationDelay: `${(r * 3 + c) * 0.4}s` }} />
               ))
             )}
@@ -856,62 +865,78 @@ function SupplyChainBackdrop() {
           const lowerPath = `M${x + 28},340 Q${(x + x2) / 2},322 ${x2 - 28},340`;
           return (
             <g key={`span-${i}`}>
-              <path d={upperPath} stroke="#3A4657" strokeWidth="1.5" fill="none" opacity="0.7" />
-              <path d={lowerPath} stroke="#3A4657" strokeWidth="1.5" fill="none" opacity="0.7" />
-              <circle r="3.2" fill="#5AB2C9" className="scm-node">
+              <path d={upperPath} stroke="#AEBBCB" strokeWidth="1.5" fill="none" opacity="0.8" />
+              <path d={lowerPath} stroke="#AEBBCB" strokeWidth="1.5" fill="none" opacity="0.8" />
+              <circle r="3.2" fill="#2694AE" className="scm-node">
                 <animateMotion dur={`${5 + i}s`} repeatCount="indefinite" path={upperPath} />
               </circle>
-              <circle r="3.2" fill="#CD8B4F" className="scm-node" style={{ animationDelay: "1.2s" }}>
+              <circle r="3.2" fill="#C1793C" className="scm-node" style={{ animationDelay: "1.2s" }}>
                 <animateMotion dur={`${6 + i}s`} repeatCount="indefinite" path={lowerPath} />
               </circle>
             </g>
           );
         })}
         {towerX.map((x, i) => (
-          <g key={`tower-${i}`} opacity="0.85">
-            <path d={`M${x - 40},430 L${x - 14},300 L${x + 14},300 L${x + 40},430 Z`} fill="none" stroke="#3A4657" strokeWidth="2" />
-            <line x1={x - 34} y1="340" x2={x + 34} y2="340" stroke="#3A4657" strokeWidth="2" />
-            <line x1={x - 20} y1="385" x2={x + 20} y2="385" stroke="#3A4657" strokeWidth="2" />
-            <line x1={x - 40} y1="430" x2={x + 40} y2="430" stroke="#3A4657" strokeWidth="2" />
-            <line x1={x} y1="300" x2={x} y2="430" stroke="#2A3341" strokeWidth="1.5" />
+          <g key={`tower-${i}`} opacity="0.9">
+            <path d={`M${x - 40},430 L${x - 14},300 L${x + 14},300 L${x + 40},430 Z`} fill="none" stroke="#AEBBCB" strokeWidth="2" />
+            <line x1={x - 34} y1="340" x2={x + 34} y2="340" stroke="#AEBBCB" strokeWidth="2" />
+            <line x1={x - 20} y1="385" x2={x + 20} y2="385" stroke="#AEBBCB" strokeWidth="2" />
+            <line x1={x - 40} y1="430" x2={x + 40} y2="430" stroke="#AEBBCB" strokeWidth="2" />
+            <line x1={x} y1="300" x2={x} y2="430" stroke="#C3CEDB" strokeWidth="1.5" />
           </g>
         ))}
 
         {/* container ship on the water */}
         <rect x="0" y="470" width="1200" height="230" fill="url(#scmWater)" />
-        <g className="scm-ship" opacity="0.8">
-          <path d="M540,500 L860,500 L830,536 L570,536 Z" fill="#1B222C" stroke="#2A3341" />
+        <g className="scm-ship" opacity="0.85">
+          <path d="M540,500 L860,500 L830,536 L570,536 Z" fill="#B7C4D3" stroke="#9AAABE" />
           {[560, 610, 660, 710, 760].map((cx, i) => (
             <rect key={i} x={cx} y="474" width="42" height="24"
-              fill={i % 2 === 0 ? "#8F6338" : "#232B37"} stroke="#0D1117" strokeWidth="1" />
+              fill={i % 2 === 0 ? "#C1793C" : "#8FA0B5"} stroke="#F7FAFD" strokeWidth="1" />
           ))}
         </g>
 
         {/* road with moving trucks */}
-        <rect x="0" y="560" width="1200" height="46" fill="#151B23" opacity="0.9" />
-        <line x1="0" y1="583" x2="1200" y2="583" stroke="#5B6675" strokeWidth="2" strokeDasharray="26 20" opacity="0.4" />
+        <rect x="0" y="560" width="1200" height="46" fill="#D8E1EA" opacity="0.9" />
+        <line x1="0" y1="583" x2="1200" y2="583" stroke="#9AAABE" strokeWidth="2" strokeDasharray="26 20" opacity="0.5" />
 
         <g className="scm-truck-a">
           <g transform="translate(0,566)">
-            <rect x="0" y="0" width="30" height="18" rx="2" fill="#8A95A6" />
-            <rect x="32" y="6" width="16" height="12" rx="2" fill="#5AB2C9" />
-            <circle cx="10" cy="20" r="4" fill="#0D1117" stroke="#5B6675" />
-            <circle cx="38" cy="20" r="4" fill="#0D1117" stroke="#5B6675" />
+            <rect x="0" y="0" width="30" height="18" rx="2" fill="#7C8CA0" />
+            <rect x="32" y="6" width="16" height="12" rx="2" fill="#2694AE" />
+            <circle cx="10" cy="20" r="4" fill="#F7FAFD" stroke="#7C8CA0" />
+            <circle cx="38" cy="20" r="4" fill="#F7FAFD" stroke="#7C8CA0" />
           </g>
         </g>
         <g className="scm-truck-b">
           <g transform="translate(0,572) scale(0.8)">
-            <rect x="0" y="0" width="30" height="18" rx="2" fill="#CD8B4F" />
-            <rect x="32" y="6" width="16" height="12" rx="2" fill="#8A95A6" />
-            <circle cx="10" cy="20" r="4" fill="#0D1117" stroke="#5B6675" />
-            <circle cx="38" cy="20" r="4" fill="#0D1117" stroke="#5B6675" />
+            <rect x="0" y="0" width="30" height="18" rx="2" fill="#C1793C" />
+            <rect x="32" y="6" width="16" height="12" rx="2" fill="#7C8CA0" />
+            <circle cx="10" cy="20" r="4" fill="#F7FAFD" stroke="#7C8CA0" />
+            <circle cx="38" cy="20" r="4" fill="#F7FAFD" stroke="#7C8CA0" />
           </g>
         </g>
       </svg>
       <div style={{
         position: "absolute", inset: 0,
-        background: "linear-gradient(115deg, rgba(10,14,20,.92) 0%, rgba(10,14,20,.72) 38%, rgba(10,14,20,.5) 62%, rgba(10,14,20,.85) 100%)",
+        background: "linear-gradient(115deg, rgba(255,255,255,.95) 0%, rgba(255,255,255,.6) 40%, rgba(255,255,255,.32) 65%, rgba(255,255,255,.9) 100%)",
       }} />
+    </div>
+  );
+}
+
+const lightInputStyle = {
+  width: "100%", background: LC.inputBg, border: `1px solid ${LC.inputBorder}`, borderRadius: 8,
+  color: LC.text, padding: "10px 12px", fontSize: 13.5, fontFamily: FB, outline: "none",
+};
+
+function LightField({ label, children }) {
+  return (
+    <div>
+      <label style={{ fontFamily: FM, fontSize: 10.5, color: LC.muted, textTransform: "uppercase", letterSpacing: ".05em", display: "block", marginBottom: 6 }}>
+        {label}
+      </label>
+      {children}
     </div>
   );
 }
@@ -962,62 +987,68 @@ function AuthScreen({ onLogin }) {
   }
 
   return (
-    <div style={{ position: "relative", minHeight: "100vh", background: C.void, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: FB, overflow: "hidden" }}>
+    <div style={{ position: "relative", minHeight: "100vh", background: "#EEF2F8", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: FB, overflow: "hidden" }}>
       <SupplyChainBackdrop />
       <div style={{ position: "relative", zIndex: 1, maxWidth: 420, width: "100%" }}>
-        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 32, boxShadow: "0 30px 70px rgba(0,0,0,.55)" }}>
+        <div style={{ background: LC.card, border: `1px solid ${LC.cardBorder}`, borderRadius: 14, padding: 32, boxShadow: "0 24px 60px rgba(30,39,51,.14)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 4 }}>
-            <Zap size={20} color={C.copper} />
-            <span style={{ fontFamily: FD, fontWeight: 700, fontSize: 18 }}>Demand Forecasting</span>
+            <Zap size={20} color={LC.copper} />
+            <span style={{ fontFamily: FD, fontWeight: 700, fontSize: 18, color: LC.text }}>Demand Forecasting</span>
           </div>
-          <p style={{ color: C.muted, fontSize: 13, margin: "0 0 24px" }}>
+          <p style={{ color: LC.muted, fontSize: 13, margin: "0 0 24px" }}>
             {mode === "login" ? "Sign in to the decision-support system." : "Create an account — an administrator must verify it before you can sign in."}
           </p>
 
           {err && (
-            <div style={{ background: `${C.red}1F`, border: `1px solid ${C.red}66`, color: C.red, borderRadius: 8, padding: "10px 13px", fontSize: 12.5, marginBottom: 16 }}>
+            <div style={{ background: `${LC.red}14`, border: `1px solid ${LC.red}55`, color: LC.red, borderRadius: 8, padding: "10px 13px", fontSize: 12.5, marginBottom: 16 }}>
               {err}
             </div>
           )}
           {info && (
-            <div style={{ background: `${C.green}1F`, border: `1px solid ${C.green}66`, color: C.green, borderRadius: 8, padding: "10px 13px", fontSize: 12.5, marginBottom: 16, lineHeight: 1.5 }}>
+            <div style={{ background: `${LC.green}14`, border: `1px solid ${LC.green}55`, color: LC.green, borderRadius: 8, padding: "10px 13px", fontSize: 12.5, marginBottom: 16, lineHeight: 1.5 }}>
               {info}
             </div>
           )}
 
           <form onSubmit={submit} style={{ display: "grid", gap: 14 }}>
             {mode === "register" && (
-              <Field label="Full name">
-                <input style={inputStyle} value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Your name" />
-              </Field>
+              <LightField label="Full name">
+                <input style={lightInputStyle} value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Your name" />
+              </LightField>
             )}
-            <Field label="Email">
-              <input style={inputStyle} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            </Field>
-            <Field label="Password">
-              <input style={inputStyle} type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-            </Field>
+            <LightField label="Email">
+              <input style={lightInputStyle} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </LightField>
+            <LightField label="Password">
+              <input style={lightInputStyle} type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            </LightField>
             {mode === "register" && (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <Field label="Role">
-                  <select style={inputStyle} value={role} onChange={(e) => setRole(e.target.value)}>
+                <LightField label="Role">
+                  <select style={lightInputStyle} value={role} onChange={(e) => setRole(e.target.value)}>
                     {Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                   </select>
-                </Field>
-                <Field label="Department">
-                  <input style={inputStyle} value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="Procurement" />
-                </Field>
+                </LightField>
+                <LightField label="Department">
+                  <input style={lightInputStyle} value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="Procurement" />
+                </LightField>
               </div>
             )}
-            <Btn type="submit" variant="primary" disabled={busy} style={{ width: "100%", justifyContent: "center", marginTop: 4 }}>
+            <button type="submit" disabled={busy} style={{
+              width: "100%", marginTop: 4, background: LC.copper, border: `1px solid ${LC.copper}`, color: "#FFFFFF",
+              fontFamily: FB, fontWeight: 600, fontSize: 13.5, padding: "10px 15px", borderRadius: 8,
+              cursor: busy ? "not-allowed" : "pointer", opacity: busy ? 0.6 : 1, transition: "filter .15s",
+            }}
+              onMouseOver={(e) => !busy && (e.currentTarget.style.filter = "brightness(1.08)")}
+              onMouseOut={(e) => (e.currentTarget.style.filter = "none")}>
               {busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
-            </Btn>
+            </button>
           </form>
 
-          <div style={{ marginTop: 18, fontSize: 12.5, color: C.muted, textAlign: "center" }}>
+          <div style={{ marginTop: 18, fontSize: 12.5, color: LC.muted, textAlign: "center" }}>
             {mode === "login" ? "No account? " : "Already registered? "}
             <button onClick={() => { setMode(mode === "login" ? "register" : "login"); setErr(null); setInfo(null); }}
-              style={{ background: "none", border: "none", color: C.copper, cursor: "pointer", fontSize: 12.5, padding: 0, fontWeight: 600 }}>
+              style={{ background: "none", border: "none", color: LC.copper, cursor: "pointer", fontSize: 12.5, padding: 0, fontWeight: 600 }}>
               {mode === "login" ? "Register" : "Sign in"}
             </button>
           </div>
