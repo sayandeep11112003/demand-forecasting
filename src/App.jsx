@@ -821,11 +821,20 @@ function SupplyChainBackdrop() {
         @keyframes scmDrift { 0% { transform: translateX(0); } 100% { transform: translateX(-140px); } }
         @keyframes scmPulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
         @keyframes scmBlink { 0%, 100% { opacity: .3; } 50% { opacity: .85; } }
+        @keyframes scmCloud1 { 0% { transform: translateX(-10%); } 100% { transform: translateX(115%); } }
+        @keyframes scmCloud2 { 0% { transform: translateX(-10%); } 100% { transform: translateX(115%); } }
+        @keyframes scmHook { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(14px); } }
+        @keyframes scmRise { 0% { transform: translateY(0); opacity: 0; } 12% { opacity: .8; } 85% { opacity: .5; } 100% { transform: translateY(-560px); opacity: 0; } }
         .scm-truck-a { animation: scmDrive 26s linear infinite; }
         .scm-truck-b { animation: scmDriveB 34s linear infinite; animation-delay: -14s; }
         .scm-ship { animation: scmDrift 70s ease-in-out infinite alternate; }
         .scm-node { animation: scmPulse 2.6s ease-in-out infinite; }
         .scm-win { animation: scmBlink 4s ease-in-out infinite; }
+        .scm-cloud-a { animation: scmCloud1 85s linear infinite; }
+        .scm-cloud-b { animation: scmCloud2 110s linear infinite; animation-delay: -40s; }
+        .scm-plane { animation: scmCloud1 48s linear infinite; animation-delay: -18s; }
+        .scm-hook { animation: scmHook 3.2s ease-in-out infinite; }
+        .scm-particle { animation: scmRise linear infinite; }
       `}</style>
       <svg viewBox="0 0 1200 700" preserveAspectRatio="xMidYMax slice" style={{ width: "100%", height: "100%", display: "block" }}>
         <defs>
@@ -841,6 +850,23 @@ function SupplyChainBackdrop() {
         </defs>
 
         <rect width="1200" height="700" fill="url(#scmSky)" />
+
+        {/* drifting clouds */}
+        <g className="scm-cloud-a" opacity="0.55">
+          <ellipse cx="120" cy="110" rx="48" ry="18" fill="#FFFFFF" />
+          <ellipse cx="160" cy="100" rx="34" ry="16" fill="#FFFFFF" />
+          <ellipse cx="88" cy="102" rx="30" ry="14" fill="#FFFFFF" />
+        </g>
+        <g className="scm-cloud-b" opacity="0.45">
+          <ellipse cx="500" cy="160" rx="60" ry="20" fill="#FFFFFF" />
+          <ellipse cx="550" cy="150" rx="38" ry="17" fill="#FFFFFF" />
+          <ellipse cx="460" cy="152" rx="32" ry="15" fill="#FFFFFF" />
+        </g>
+
+        {/* cargo plane */}
+        <g className="scm-plane" opacity="0.6">
+          <path d="M0,60 l26,0 l10,-6 l6,0 l-6,6 l10,0 l6,3 l-6,3 l-10,0 l6,6 l-6,0 l-10,-6 l-26,0 Z" fill="#7C8CA0" />
+        </g>
 
         {/* distant warehouse / port skyline */}
         {[
@@ -896,6 +922,18 @@ function SupplyChainBackdrop() {
           ))}
         </g>
 
+        {/* port gantry crane */}
+        <g opacity="0.8">
+          <line x1="900" y1="470" x2="900" y2="560" stroke="#9AAABE" strokeWidth="4" />
+          <line x1="900" y1="475" x2="1010" y2="440" stroke="#9AAABE" strokeWidth="4" />
+          <line x1="900" y1="475" x2="1010" y2="440" stroke="#9AAABE" strokeWidth="4" />
+          <line x1="890" y1="490" x2="960" y2="465" stroke="#9AAABE" strokeWidth="3" />
+          <g className="scm-hook">
+            <line x1="960" y1="465" x2="960" y2="500" stroke="#C1793C" strokeWidth="2" />
+            <rect x="950" y="498" width="20" height="12" rx="2" fill="#C1793C" />
+          </g>
+        </g>
+
         {/* road with moving trucks */}
         <rect x="0" y="560" width="1200" height="46" fill="#D8E1EA" opacity="0.9" />
         <line x1="0" y1="583" x2="1200" y2="583" stroke="#9AAABE" strokeWidth="2" strokeDasharray="26 20" opacity="0.5" />
@@ -916,6 +954,13 @@ function SupplyChainBackdrop() {
             <circle cx="38" cy="20" r="4" fill="#F7FAFD" stroke="#7C8CA0" />
           </g>
         </g>
+
+        {/* rising data particles — nods to the forecasting theme */}
+        {[120, 210, 300, 430, 780, 900, 1010, 1120].map((x, i) => (
+          <circle key={i} className="scm-particle" cx={x} cy="600" r={i % 2 === 0 ? 3 : 2.2}
+            fill={i % 3 === 0 ? "#C1793C" : "#2694AE"}
+            style={{ animationDuration: `${9 + (i % 4) * 2}s`, animationDelay: `${i * 1.3}s` }} />
+        ))}
       </svg>
       <div style={{
         position: "absolute", inset: 0,

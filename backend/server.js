@@ -65,6 +65,42 @@ async function seedIfEmpty() {
 }
 await seedIfEmpty();
 
+async function upsertUser(users, { full_name, email, password, role, department }) {
+  const normEmail = String(email).trim().toLowerCase();
+  const idx = users.findIndex((u) => u.email.toLowerCase() === normEmail);
+  const record = {
+    user_id: idx === -1 ? crypto.randomUUID() : users[idx].user_id,
+    full_name: String(full_name).trim(),
+    email: normEmail,
+    role: VALID_ROLES.includes(role) ? role : "viewer",
+    department: department || users[idx]?.department || "IT",
+    password_hash: await bcrypt.hash(password, 10),
+    status: "active",
+    token: null,
+    token_expires: null,
+    last_login_at: users[idx]?.last_login_at || null,
+    created_at: users[idx]?.created_at || new Date().toISOString(),
+  };
+  if (idx === -1) users.push(record); else users[idx] = record;
+  return record;
+}
+
+// Most free hosting tiers (Render, Railway) don't persist local disk across
+// deploys — each new deploy starts from a clean filesystem, which would
+// otherwise silently drop any account created after the initial seed. Re-apply
+// this pinned admin from env vars on every boot so it survives every redeploy.
+async function seedPinnedAdmin() {
+  const { SEED_ADMIN_NAME, SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD } = process.env;
+  if (!SEED_ADMIN_NAME || !SEED_ADMIN_EMAIL || !SEED_ADMIN_PASSWORD) return;
+  const users = loadUsers();
+  await upsertUser(users, {
+    full_name: SEED_ADMIN_NAME, email: SEED_ADMIN_EMAIL, password: SEED_ADMIN_PASSWORD,
+    role: "admin", department: "IT",
+  });
+  saveUsers(users);
+}
+await seedPinnedAdmin();
+
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const RESEND_FROM = process.env.RESEND_FROM || "Demand Forecasting <onboarding@resend.dev>";
 
@@ -107,49 +143,6 @@ function htmlPage(title, body) {
 }
 
 app.get("/api/health", (req, res) => res.json({ ok: true }));
-
-// Temporary maintenance endpoint for directly upserting an active account,
-// e.g. to fix a mis-entered name without going through the email-verification
-// flow again. Only reachable when SEED_SECRET is set; remove that env var
-// (and this route) once no longer needed.
-if (process.env.SEED_SECRET) {
-  app.post("/api/admin/seed-user", async (req, res) => {
-    if (req.headers["x-seed-secret"] !== process.env.SEED_SECRET) {
-      return res.status(404).end();
-    }
-    try {
-      const { full_name, email, password, role } = req.body || {};
-      if (!full_name || !email || !password) return res.status(400).json({ error: "full_name, email and password are required." });
-      const safeRole = VALID_ROLES.includes(role) ? role : "viewer";
-      const normEmail = String(email).trim().toLowerCase();
-      const password_hash = await bcrypt.hash(password, 10);
-
-      const users = loadUsers();
-      const idx = users.findIndex((u) => u.email.toLowerCase() === normEmail);
-      const record = {
-        user_id: idx === -1 ? crypto.randomUUID() : users[idx].user_id,
-        full_name: String(full_name).trim(),
-        email: normEmail,
-        role: safeRole,
-        department: users[idx]?.department || "IT",
-        password_hash,
-        status: "active",
-        token: null,
-        token_expires: null,
-        last_login_at: users[idx]?.last_login_at || null,
-        created_at: users[idx]?.created_at || new Date().toISOString(),
-      };
-      if (idx === -1) users.push(record); else users[idx] = record;
-      saveUsers(users);
-
-      const { password_hash: _omit, ...safe } = record;
-      res.json({ ok: true, user: safe });
-    } catch (err) {
-      console.error("seed-user error:", err);
-      res.status(500).json({ error: "Seed failed." });
-    }
-  });
-}
 
 app.post("/api/auth/register", async (req, res) => {
   try {
