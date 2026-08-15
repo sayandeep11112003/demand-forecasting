@@ -18,6 +18,8 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "framer-motion": "^13.1.0",
+    "gsap": "^3.15.0",
     "lucide-react": "^1.31.0",
     "postprocessing": "^6.39.4",
     "react": "^19.2.8",

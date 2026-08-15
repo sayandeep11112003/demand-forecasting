@@ -12,6 +12,7 @@ import { apiLogin, apiRegister } from "./api.js";
 
 const LoginScene3D = lazy(() => import("./scenes/LoginScene3D.jsx"));
 const NetworkGraph3D = lazy(() => import("./scenes/NetworkGraph3D.jsx"));
+const Landing = lazy(() => import("./Landing.jsx"));
 const ForecastBars3D = lazy(() => import("./scenes/ForecastBars3D.jsx"));
 
 /* ============================================================================
@@ -1123,7 +1124,7 @@ function LightField({ label, children }) {
   );
 }
 
-function AuthScreen({ onLogin }) {
+function AuthScreen({ onLogin, onBack }) {
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -1178,6 +1179,12 @@ function AuthScreen({ onLogin }) {
         background: "radial-gradient(ellipse at 50% 50%, rgba(8,12,20,.22) 0%, rgba(8,12,20,.5) 75%, rgba(8,12,20,.68) 100%)",
       }} />
       <div style={{ position: "relative", zIndex: 1, maxWidth: 420, width: "100%" }}>
+        {onBack && (
+          <button onClick={onBack} style={{
+            background: "none", border: "none", color: "#FFFFFF", fontFamily: FB, fontSize: 12.5,
+            cursor: "pointer", marginBottom: 14, padding: 0, opacity: 0.85, textShadow: "0 1px 4px rgba(0,0,0,.5)",
+          }}>← Back to home</button>
+        )}
         <div style={{
           background: "rgba(255,255,255,.87)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
           border: `1px solid ${LC.cardBorder}`, borderRadius: 14, padding: 32, boxShadow: "0 24px 60px rgba(8,12,20,.35)",
@@ -2093,6 +2100,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [route, setRoute] = useState("overview");
   const [toast, setToast] = useState(null);
+  const [entered, setEntered] = useState(false);
 
   const flash = useCallback((msg) => {
     setToast(msg);
@@ -2145,8 +2153,15 @@ export default function App() {
   }, []);
 
   if (!user) {
+    if (!entered) {
+      return (
+        <Suspense fallback={<div style={{ minHeight: "100vh", background: C.void }} />}>
+          <Landing onEnter={() => setEntered(true)} model={MODEL} />
+        </Suspense>
+      );
+    }
     return (
-      <AuthScreen onLogin={(u) => { setUser(u); setRoute("overview"); }} />
+      <AuthScreen onLogin={(u) => { setUser(u); setRoute("overview"); }} onBack={() => setEntered(false)} />
     );
   }
 
