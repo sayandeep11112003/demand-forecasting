@@ -1,203 +1,144 @@
 import React, { useMemo, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Sparkles } from "@react-three/drei";
-import * as THREE from "three";
 
-/* Real 3D scene (not a 2D image) for the login background. Camera parallaxes
-   with the pointer for a genuine "interacting" feel; every moving piece here
-   (turbine blades, current pulses, the truck, the ship) animates via
-   useFrame on the actual render loop, not CSS. */
+/* Real photo (transmission towers over a dusk city) as the background, with a
+   genuinely live Three.js network-graph layer rendered on top in a
+   transparent canvas: nodes pulse, pulses travel the lines, edges rewire
+   over time, and the whole layer parallaxes against the fixed photo as the
+   pointer moves — everything animates on the actual render loop. */
 
-const PALETTE = {
-  ground: "#E4ECF4", groundFar: "#CFDCE9",
-  structure: "#96A6BA", structureDark: "#7C8CA0",
-  copper: "#C1793C", cyan: "#2694AE",
-  water: "#BFD6E5",
-  sky: "#EEF3F9",
-};
+const CYAN = "#37E7F0";
+const CYAN_DIM = "#1FA8B3";
 
-function Rig() {
+// Hand-placed to echo the reference photo's network composition: dense
+// upper-left, thinning out toward the lower-right where the real towers sit.
+const NODES = [
+  [-7.6, 3.3], [-6.4, 2.2], [-5.0, 3.6], [-4.6, 1.4], [-3.0, 2.6],
+  [-1.6, 3.7], [-0.4, 1.8], [1.1, 2.9], [2.4, 1.1], [3.6, 2.4],
+  [-6.8, -0.4], [-4.2, -1.1], [-1.2, -0.6], [1.6, -1.4], [4.2, 0.2],
+  [-2.6, 0.6], [0.4, 0.3],
+];
+
+const BASE_EDGES = [
+  [0, 1], [1, 2], [1, 3], [2, 4], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8], [8, 9],
+  [1, 10], [3, 11], [6, 12], [8, 13], [9, 14], [10, 11], [11, 15], [12, 15],
+  [12, 16], [13, 16], [4, 15], [7, 16],
+];
+// Extra candidate edges the network occasionally "rewires" into, for a
+// visibly live, changing graph rather than a static frozen mesh.
+const CANDIDATE_EDGES = [
+  [0, 2], [2, 5], [5, 7], [9, 13], [10, 12], [14, 16], [3, 15], [6, 16], [2, 15],
+];
+
+function Rig({ children }) {
+  const group = useRef(null);
   useFrame((state) => {
-    const { pointer, camera } = state;
-    camera.position.x += (pointer.x * 2.2 - camera.position.x) * 0.02;
-    camera.position.y += (2.6 - pointer.y * 1.1 - camera.position.y) * 0.02;
-    camera.lookAt(0, 0.6, 0);
+    if (!group.current) return;
+    group.current.position.x += (state.pointer.x * 0.55 - group.current.position.x) * 0.04;
+    group.current.position.y += (state.pointer.y * 0.35 - group.current.position.y) * 0.04;
   });
-  return null;
+  return <group ref={group}>{children}</group>;
 }
 
-function Tower({ x }) {
-  const legMat = PALETTE.structure;
-  return (
-    <group position={[x, 0, 0]}>
-      {[[-0.55, -0.18], [0.55, -0.18], [-0.3, 0.18], [0.3, 0.18]].map(([dx, dz], i) => (
-        <mesh key={i} position={[dx * 0.55, 1.1, dz]} rotation={[0, 0, dx > 0 ? -0.12 : 0.12]}>
-          <boxGeometry args={[0.05, 2.2, 0.05]} />
-          <meshStandardMaterial color={legMat} />
-        </mesh>
-      ))}
-      <mesh position={[0, 2.2, 0]}>
-        <boxGeometry args={[1.15, 0.05, 0.05]} />
-        <meshStandardMaterial color={legMat} />
-      </mesh>
-      <mesh position={[0, 1.75, 0]}>
-        <boxGeometry args={[0.9, 0.05, 0.05]} />
-        <meshStandardMaterial color={legMat} />
-      </mesh>
-    </group>
-  );
-}
-
-function CurrentPulse({ from, to, speed, color }) {
+function Node({ pos, delay }) {
   const ref = useRef(null);
-  const curve = useMemo(() => new THREE.CatmullRomCurve3([
-    new THREE.Vector3(...from),
-    new THREE.Vector3((from[0] + to[0]) / 2, Math.max(from[1], to[1]) + 0.35, (from[2] + to[2]) / 2),
-    new THREE.Vector3(...to),
-  ]), [from, to]);
-
+  const born = useRef(false);
   useFrame((state) => {
-    const t = (state.clock.elapsedTime * speed) % 1;
-    const p = curve.getPoint(t);
-    if (ref.current) ref.current.position.copy(p);
+    if (!ref.current) return;
+    const t = state.clock.elapsedTime;
+    const grown = Math.min(1, Math.max(0, (t - delay) / 0.6));
+    const pulse = 1 + Math.sin(t * 2.2 + delay * 7) * 0.12;
+    ref.current.scale.setScalar(grown * pulse * 0.11);
+    ref.current.material.emissiveIntensity = 1.1 + Math.sin(t * 2.2 + delay * 7) * 0.5;
   });
-
   return (
-    <mesh ref={ref}>
-      <sphereGeometry args={[0.045, 8, 8]} />
-      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.4} />
+    <mesh ref={ref} position={[pos[0], pos[1], 0]} scale={0}>
+      <sphereGeometry args={[1, 12, 12]} />
+      <meshStandardMaterial color={CYAN} emissive={CYAN} emissiveIntensity={1.2} toneMapped={false} />
     </mesh>
   );
 }
 
-function TransmissionLine() {
-  const towerX = [-4.5, -2.2, 0, 2.2, 4.5];
-  return (
-    <group>
-      {towerX.map((x, i) => <Tower key={i} x={x} />)}
-      {towerX.slice(0, -1).map((x, i) => {
-        const x2 = towerX[i + 1];
-        return (
-          <React.Fragment key={i}>
-            <line>
-              <bufferGeometry>
-                <bufferAttribute attach="attributes-position" args={[new Float32Array([x, 2.2, 0, x2, 2.2, 0]), 3]} />
-              </bufferGeometry>
-              <lineBasicMaterial color={PALETTE.structureDark} />
-            </line>
-            <CurrentPulse from={[x, 2.2, 0]} to={[x2, 2.2, 0]} speed={0.12 + i * 0.02} color={PALETTE.cyan} />
-            <CurrentPulse from={[x, 1.75, 0]} to={[x2, 1.75, 0]} speed={0.1 + i * 0.015} color={PALETTE.copper} />
-          </React.Fragment>
-        );
-      })}
-    </group>
-  );
-}
-
-function WindTurbine({ position }) {
-  const blades = useRef(null);
-  useFrame((_, delta) => { if (blades.current) blades.current.rotation.z += delta * 1.6; });
-  return (
-    <group position={position}>
-      <mesh position={[0, 0.75, 0]}>
-        <cylinderGeometry args={[0.035, 0.05, 1.5, 8]} />
-        <meshStandardMaterial color={PALETTE.structure} />
-      </mesh>
-      <group ref={blades} position={[0, 1.5, 0.05]}>
-        {[0, 120, 240].map((deg) => (
-          <mesh key={deg} rotation={[0, 0, THREE.MathUtils.degToRad(deg)]} position={[0, 0.32, 0]}>
-            <boxGeometry args={[0.045, 0.62, 0.02]} />
-            <meshStandardMaterial color={PALETTE.structureDark} />
-          </mesh>
-        ))}
-      </group>
-    </group>
-  );
-}
-
-function Truck({ z, speed, color, delay }) {
-  const ref = useRef(null);
+function Edge({ a, b, delay, fadeSeed }) {
+  const matRef = useRef(null);
+  const positions = useMemo(() => new Float32Array([a[0], a[1], 0, b[0], b[1], 0]), [a, b]);
   useFrame((state) => {
-    const t = ((state.clock.elapsedTime * speed + delay) % 1);
-    if (ref.current) ref.current.position.x = -6 + t * 12;
+    if (!matRef.current) return;
+    const t = state.clock.elapsedTime;
+    const grown = Math.min(1, Math.max(0, (t - delay) / 0.6));
+    const flicker = 0.55 + Math.sin(t * 1.4 + fadeSeed * 9) * 0.2;
+    matRef.current.opacity = grown * flicker;
   });
   return (
-    <group ref={ref} position={[0, 0.14, z]}>
-      <mesh position={[0, 0.09, 0]}>
-        <boxGeometry args={[0.32, 0.16, 0.14]} />
-        <meshStandardMaterial color={color} />
-      </mesh>
-      <mesh position={[0.22, 0.11, 0]}>
-        <boxGeometry args={[0.14, 0.12, 0.13]} />
-        <meshStandardMaterial color={PALETTE.cyan} />
-      </mesh>
-      {[[-0.11, -0.075], [0.11, -0.075], [-0.11, 0.075], [0.11, 0.075]].map(([x, zz], i) => (
-        <mesh key={i} position={[x, 0, zz]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.035, 0.035, 0.03, 10]} />
-          <meshStandardMaterial color="#3A4657" />
-        </mesh>
-      ))}
-    </group>
+    <line>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      </bufferGeometry>
+      <lineBasicMaterial ref={matRef} color={CYAN_DIM} transparent opacity={0} />
+    </line>
   );
 }
 
-function Ship() {
+function Pulse({ a, b, speed, delay }) {
   const ref = useRef(null);
   useFrame((state) => {
-    if (ref.current) ref.current.position.x = Math.sin(state.clock.elapsedTime * 0.06) * 3;
+    if (!ref.current) return;
+    const t = state.clock.elapsedTime;
+    if (t < delay) { ref.current.visible = false; return; }
+    ref.current.visible = true;
+    const p = ((t - delay) * speed) % 1;
+    ref.current.position.set(a[0] + (b[0] - a[0]) * p, a[1] + (b[1] - a[1]) * p, 0.01);
   });
   return (
-    <group ref={ref} position={[0, -0.35, 3.4]}>
-      <mesh>
-        <boxGeometry args={[2.2, 0.28, 0.55]} />
-        <meshStandardMaterial color={PALETTE.structureDark} />
-      </mesh>
-      {[-0.8, -0.4, 0, 0.4, 0.8].map((x, i) => (
-        <mesh key={i} position={[x, 0.24, 0]}>
-          <boxGeometry args={[0.34, 0.2, 0.4]} />
-          <meshStandardMaterial color={i % 2 === 0 ? PALETTE.copper : "#8FA0B5"} />
-        </mesh>
-      ))}
-    </group>
+    <mesh ref={ref}>
+      <sphereGeometry args={[0.055, 8, 8]} />
+      <meshStandardMaterial color="#FFFFFF" emissive={CYAN} emissiveIntensity={2.4} toneMapped={false} />
+    </mesh>
   );
 }
 
-function Ground() {
+function NetworkOverlay() {
+  const edges = useMemo(() => {
+    const all = [...BASE_EDGES.map((e, i) => ({ e, delay: i * 0.08, seed: i }))];
+    CANDIDATE_EDGES.forEach((e, i) => all.push({ e, delay: 4 + i * 1.6, seed: 100 + i }));
+    return all;
+  }, []);
+
+  const pulses = useMemo(() => BASE_EDGES.filter((_, i) => i % 3 === 0).map((e, i) => ({
+    e, speed: 0.16 + (i % 4) * 0.05, delay: i * 0.6,
+  })), []);
+
   return (
-    <>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-        <planeGeometry args={[30, 6]} />
-        <meshStandardMaterial color={PALETTE.ground} />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.36, 3.6]}>
-        <planeGeometry args={[30, 3.2]} />
-        <meshStandardMaterial color={PALETTE.water} />
-      </mesh>
-    </>
+    <Rig>
+      {edges.map(({ e, delay, seed }, i) => (
+        <Edge key={i} a={NODES[e[0]]} b={NODES[e[1]]} delay={delay} fadeSeed={seed} />
+      ))}
+      {NODES.map((pos, i) => <Node key={i} pos={pos} delay={i * 0.09} />)}
+      {pulses.map(({ e, speed, delay }, i) => (
+        <Pulse key={i} a={NODES[e[0]]} b={NODES[e[1]]} speed={speed} delay={delay} />
+      ))}
+    </Rig>
   );
 }
 
 export default function LoginScene3D() {
   return (
-    <Canvas
-      camera={{ position: [0, 2.6, 6.5], fov: 42 }}
-      gl={{ antialias: true, alpha: false }}
-      style={{ position: "absolute", inset: 0 }}
-      dpr={[1, 1.5]}
-    >
-      <color attach="background" args={[PALETTE.sky]} />
-      <fog attach="fog" args={[PALETTE.sky, 6, 16]} />
-      <ambientLight intensity={0.85} />
-      <directionalLight position={[4, 6, 3]} intensity={1.1} />
-      <Rig />
-      <Ground />
-      <TransmissionLine />
-      <WindTurbine position={[-3.4, 0, -1.6]} />
-      <WindTurbine position={[3.7, 0, -1.8]} />
-      <Truck z={0.9} speed={0.045} color="#7C8CA0" delay={0} />
-      <Truck z={1.15} speed={0.06} color={PALETTE.copper} delay={0.4} />
-      <Ship />
-      <Sparkles count={26} scale={[9, 3, 6]} size={2.4} speed={0.25} color={PALETTE.copper} position={[0, 1.4, 1]} opacity={0.6} />
-    </Canvas>
+    <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
+      <img
+        src="/scene/grid-network.jpg"
+        alt=""
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "60% 40%" }}
+      />
+      <Canvas
+        orthographic
+        camera={{ zoom: 55, position: [0, 0, 10] }}
+        gl={{ alpha: true, antialias: true }}
+        style={{ position: "absolute", inset: 0 }}
+        dpr={[1, 1.5]}
+      >
+        <ambientLight intensity={0.6} />
+        <NetworkOverlay />
+      </Canvas>
+    </div>
   );
 }

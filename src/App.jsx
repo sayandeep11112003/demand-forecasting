@@ -1173,11 +1173,14 @@ function AuthScreen({ onLogin }) {
         <LoginScene3D />
       </Suspense>
       <div style={{
-        position: "absolute", inset: 0, zIndex: 0,
-        background: "linear-gradient(115deg, rgba(255,255,255,.9) 0%, rgba(255,255,255,.5) 40%, rgba(255,255,255,.25) 65%, rgba(255,255,255,.85) 100%)",
+        position: "absolute", inset: 0, zIndex: 0, pointerEvents: "none",
+        background: "radial-gradient(ellipse at 50% 50%, rgba(8,12,20,.22) 0%, rgba(8,12,20,.5) 75%, rgba(8,12,20,.68) 100%)",
       }} />
       <div style={{ position: "relative", zIndex: 1, maxWidth: 420, width: "100%" }}>
-        <div style={{ background: LC.card, border: `1px solid ${LC.cardBorder}`, borderRadius: 14, padding: 32, boxShadow: "0 24px 60px rgba(30,39,51,.14)" }}>
+        <div style={{
+          background: "rgba(255,255,255,.87)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
+          border: `1px solid ${LC.cardBorder}`, borderRadius: 14, padding: 32, boxShadow: "0 24px 60px rgba(8,12,20,.35)",
+        }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 4 }}>
             <Zap size={20} color={LC.copper} />
             <span style={{ fontFamily: FD, fontWeight: 700, fontSize: 18, color: LC.text }}>Demand Forecasting</span>
