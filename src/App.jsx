@@ -2081,6 +2081,25 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const [entered, setEntered] = useState(null);
 
+  /* Landing → Auth is a real navigation step from the user's point of view,
+     so it needs a browser history entry — otherwise the browser Back button
+     (or a swipe-back gesture) skips straight past this app entirely instead
+     of returning to the landing page. */
+  const enterAuth = useCallback((mode) => {
+    const m = mode || "login";
+    window.history.pushState({ entered: m }, "");
+    setEntered(m);
+  }, []);
+  const backToLanding = useCallback(() => {
+    if (window.history.state?.entered) window.history.back();
+    else setEntered(null);
+  }, []);
+  useEffect(() => {
+    const onPopState = (e) => setEntered(e.state?.entered ?? null);
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
   const flash = useCallback((msg) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2600);
@@ -2135,12 +2154,12 @@ export default function App() {
     if (!entered) {
       return (
         <Suspense fallback={<div style={{ minHeight: "100vh", background: C.void }} />}>
-          <Landing onEnter={(mode) => setEntered(mode || "login")} model={MODEL} />
+          <Landing onEnter={enterAuth} model={MODEL} />
         </Suspense>
       );
     }
     return (
-      <AuthScreen onLogin={(u) => { setUser(u); setRoute("overview"); }} onBack={() => setEntered(null)} initialMode={entered} />
+      <AuthScreen onLogin={(u) => { setUser(u); setRoute("overview"); }} onBack={backToLanding} initialMode={entered} />
     );
   }
 
