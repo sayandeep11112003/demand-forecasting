@@ -93,7 +93,11 @@ function Nav({ onEnter }) {
             cursor: "pointer", display: window.innerWidth < 720 ? "none" : "block",
           }}>{label}</button>
         ))}
-        <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }} onClick={onEnter} style={{
+        <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }} onClick={() => onEnter("register")} style={{
+          background: "transparent", border: `1px solid ${L.border}`, color: L.text, fontFamily: FB, fontWeight: 600,
+          fontSize: 13, padding: "8px 16px", borderRadius: 7, cursor: "pointer",
+        }}>Register</motion.button>
+        <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }} onClick={() => onEnter("login")} style={{
           background: L.copper, border: "none", color: L.void, fontFamily: FB, fontWeight: 600,
           fontSize: 13, padding: "9px 18px", borderRadius: 7, cursor: "pointer",
         }}>Sign In</motion.button>
@@ -146,16 +150,20 @@ function Hero({ onEnter }) {
         </motion.p>
         <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.34 }}
           style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
-          <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }} onClick={onEnter} style={{
+          <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }} onClick={() => onEnter("login")} style={{
             background: L.copper, border: "none", color: L.void, fontFamily: FB, fontWeight: 600, fontSize: 14.5,
             padding: "13px 26px", borderRadius: 9, cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
           }}>Enter Platform <ArrowRight size={16} /></motion.button>
-          <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
+          <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }} onClick={() => onEnter("register")} style={{
+            background: "transparent", border: `1px solid ${L.cyan}`, color: L.cyan, fontFamily: FB,
+            fontWeight: 600, fontSize: 14.5, padding: "13px 26px", borderRadius: 9, cursor: "pointer",
+          }}>Register</motion.button>
+          <button
             onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
             style={{
-              background: "transparent", border: `1px solid ${L.border}`, color: L.text, fontFamily: FB,
-              fontWeight: 600, fontSize: 14.5, padding: "13px 26px", borderRadius: 9, cursor: "pointer",
-            }}>See how it works</motion.button>
+              background: "none", border: "none", color: L.muted, fontFamily: FB,
+              fontWeight: 600, fontSize: 14.5, padding: "13px 10px", cursor: "pointer",
+            }}>See how it works</button>
         </motion.div>
       </div>
       <motion.div
@@ -314,10 +322,16 @@ function FinalCTA({ onEnter }) {
         <p style={{ fontFamily: FB, fontSize: 15, color: L.muted, maxWidth: 520, margin: "0 auto 34px", lineHeight: 1.6 }}>
           Sign in with a seeded demo account or register — an administrator approves new accounts before access is granted.
         </p>
-        <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }} onClick={onEnter} style={{
-          background: L.copper, border: "none", color: L.void, fontFamily: FB, fontWeight: 700, fontSize: 15.5,
-          padding: "15px 34px", borderRadius: 10, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 9,
-        }}>Enter Platform <ArrowRight size={17} /></motion.button>
+        <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
+          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }} onClick={() => onEnter("login")} style={{
+            background: L.copper, border: "none", color: L.void, fontFamily: FB, fontWeight: 700, fontSize: 15.5,
+            padding: "15px 34px", borderRadius: 10, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 9,
+          }}>Enter Platform <ArrowRight size={17} /></motion.button>
+          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }} onClick={() => onEnter("register")} style={{
+            background: "transparent", border: `1px solid ${L.cyan}`, color: L.cyan, fontFamily: FB, fontWeight: 700,
+            fontSize: 15.5, padding: "15px 34px", borderRadius: 10, cursor: "pointer",
+          }}>Register a New Account</motion.button>
+        </div>
       </motion.div>
       <div style={{ marginTop: 70, fontFamily: FM, fontSize: 11, color: L.faint }}>
         Demand Forecasting — built on Random Forest, Isolation Forest and Three.js

@@ -1124,8 +1124,8 @@ function LightField({ label, children }) {
   );
 }
 
-function AuthScreen({ onLogin, onBack }) {
-  const [mode, setMode] = useState("login");
+function AuthScreen({ onLogin, onBack, initialMode }) {
+  const [mode, setMode] = useState(initialMode === "register" ? "register" : "login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -2100,7 +2100,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [route, setRoute] = useState("overview");
   const [toast, setToast] = useState(null);
-  const [entered, setEntered] = useState(false);
+  const [entered, setEntered] = useState(null);
 
   const flash = useCallback((msg) => {
     setToast(msg);
@@ -2156,12 +2156,12 @@ export default function App() {
     if (!entered) {
       return (
         <Suspense fallback={<div style={{ minHeight: "100vh", background: C.void }} />}>
-          <Landing onEnter={() => setEntered(true)} model={MODEL} />
+          <Landing onEnter={(mode) => setEntered(mode || "login")} model={MODEL} />
         </Suspense>
       );
     }
     return (
-      <AuthScreen onLogin={(u) => { setUser(u); setRoute("overview"); }} onBack={() => setEntered(false)} />
+      <AuthScreen onLogin={(u) => { setUser(u); setRoute("overview"); }} onBack={() => setEntered(null)} initialMode={entered} />
     );
   }
 
