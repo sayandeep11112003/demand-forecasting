@@ -293,8 +293,17 @@ function HowItWorks() {
   }, []);
 
   return (
-    <section id="how" ref={sectionRef} style={{ minHeight: "100vh", scrollSnapAlign: "start", padding: "110px 24px 80px", background: L.panel }}>
-      <div style={{ maxWidth: 1000, margin: "0 auto" }}>
+    <section id="how" ref={sectionRef} style={{
+      minHeight: "100vh", scrollSnapAlign: "start", padding: "110px 24px 80px", background: L.panel,
+      display: "flex", alignItems: "center",
+    }}>
+      <style>{`
+        @keyframes howFlowDash { to { stroke-dashoffset: -600; } }
+        @keyframes howPulseA { 0% { offset-distance: 0%; opacity: 0; } 8% { opacity: 1; } 92% { opacity: 1; } 100% { offset-distance: 100%; opacity: 0; } }
+        .how-flow-line { stroke-dasharray: 6 10; animation: howFlowDash 14s linear infinite; }
+        .how-pulse { offset-path: path('M 40,20 H 960'); animation: howPulseA 5s linear infinite; }
+      `}</style>
+      <div style={{ maxWidth: 1000, margin: "0 auto", width: "100%" }}>
         <div style={{ textAlign: "center", marginBottom: 56 }}>
           <div style={{ fontFamily: FM, fontSize: 11.5, letterSpacing: ".14em", color: L.cyan, textTransform: "uppercase", marginBottom: 12 }}>
             How it works
@@ -303,14 +312,27 @@ function HowItWorks() {
             From raw events to action
           </h2>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 30 }}>
-          {STEPS.map((s, i) => (
-            <div key={s.n} ref={(el) => (cardRefs.current[i] = el)}>
-              <div style={{ fontFamily: FD, fontSize: 34, fontWeight: 700, color: L.border, marginBottom: 10 }}>{s.n}</div>
-              <div style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, color: L.text, marginBottom: 10 }}>{s.title}</div>
-              <div style={{ fontFamily: FB, fontSize: 13.5, color: L.muted, lineHeight: 1.6 }}>{s.body}</div>
-            </div>
-          ))}
+        <div style={{ position: "relative" }}>
+          <svg viewBox="0 0 1000 40" preserveAspectRatio="none" style={{
+            position: "absolute", top: -34, left: 0, width: "100%", height: 40, overflow: "visible", display: window.innerWidth < 720 ? "none" : "block",
+          }}>
+            <line x1="40" y1="20" x2="960" y2="20" stroke={L.border} strokeWidth="2" className="how-flow-line" />
+            <circle r="4" fill={L.cyan} className="how-pulse" />
+            <circle r="4" fill={L.copper} className="how-pulse" style={{ animationDelay: "2.5s" }} />
+          </svg>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 30 }}>
+            {STEPS.map((s, i) => (
+              <div key={s.n} ref={(el) => (cardRefs.current[i] = el)}>
+                <div style={{
+                  width: 44, height: 44, borderRadius: "50%", background: L.void, border: `1px solid ${L.border}`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontFamily: FD, fontSize: 15, fontWeight: 700, color: L.cyan, marginBottom: 16,
+                }}>{s.n}</div>
+                <div style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, color: L.text, marginBottom: 10 }}>{s.title}</div>
+                <div style={{ fontFamily: FB, fontSize: 13.5, color: L.muted, lineHeight: 1.6 }}>{s.body}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </section>
@@ -358,14 +380,58 @@ function StatsSection({ model }) {
   );
 }
 
+const CTA_NODES = [
+  [8, 18], [18, 62], [30, 30], [42, 78], [15, 88], [72, 20], [86, 55], [64, 85], [92, 82], [50, 12],
+];
+const CTA_EDGES = [[0, 2], [2, 5], [5, 9], [1, 4], [1, 2], [6, 8], [6, 7], [3, 4], [3, 7], [5, 6]];
+
+function AmbientNodes() {
+  const ref = useRef(null);
+  const raf = useRef(0);
+  const onMove = (e) => {
+    if (raf.current) return;
+    const el = ref.current;
+    raf.current = requestAnimationFrame(() => {
+      raf.current = 0;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const px = (e.clientX - rect.left) / rect.width - 0.5;
+      const py = (e.clientY - rect.top) / rect.height - 0.5;
+      el.style.transform = `translate(${px * -14}px, ${py * -14}px)`;
+    });
+  };
+  return (
+    <div onMouseMove={onMove} style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
+      <style>{`
+        @keyframes ctaPulse { 0%, 100% { opacity: .3; } 50% { opacity: .9; } }
+        .cta-node { animation: ctaPulse 3s ease-in-out infinite; }
+      `}</style>
+      <svg ref={ref} viewBox="0 0 100 100" preserveAspectRatio="none" style={{
+        position: "absolute", inset: 0, width: "100%", height: "100%", transition: "transform .15s ease-out",
+      }}>
+        {CTA_EDGES.map(([a, b], i) => (
+          <line key={i} x1={CTA_NODES[a][0]} y1={CTA_NODES[a][1]} x2={CTA_NODES[b][0]} y2={CTA_NODES[b][1]}
+            stroke={L.border} strokeWidth="0.15" opacity="0.7" />
+        ))}
+        {CTA_NODES.map(([x, y], i) => (
+          <circle key={i} cx={x} cy={y} r="0.6" fill={i % 2 === 0 ? L.cyan : L.copper} className="cta-node"
+            style={{ animationDelay: `${i * 0.35}s` }} />
+        ))}
+      </svg>
+    </div>
+  );
+}
+
 function FinalCTA({ onEnter }) {
   return (
     <section style={{
-      minHeight: "100vh", scrollSnapAlign: "start", display: "flex", flexDirection: "column",
-      alignItems: "center", justifyContent: "center", textAlign: "center", padding: "24px",
+      position: "relative", minHeight: "100vh", scrollSnapAlign: "start", display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center", textAlign: "center", padding: "24px", overflow: "hidden",
       background: `radial-gradient(ellipse at 50% 40%, ${L.panel} 0%, ${L.void} 70%)`,
     }}>
-      <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.7 }}>
+      <AmbientNodes />
+      <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.7 }}
+        style={{ position: "relative", zIndex: 1 }}>
         <div style={{ fontFamily: FM, fontSize: 11.5, letterSpacing: ".14em", color: L.cyan, textTransform: "uppercase", marginBottom: 16 }}>
           Ready when you are
         </div>
