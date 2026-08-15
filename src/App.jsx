@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef, Suspense, lazy } from "react";
 import {
   ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Cell, LabelList,
@@ -9,6 +9,9 @@ import {
   Plus, Pencil, Trash2, X, LogOut, Search, Lock,
 } from "lucide-react";
 import { apiLogin, apiRegister } from "./api.js";
+
+const LoginScene3D = lazy(() => import("./scenes/LoginScene3D.jsx"));
+const NetworkGraph3D = lazy(() => import("./scenes/NetworkGraph3D.jsx"));
 
 /* ============================================================================
    TRAINED MODEL BUNDLE
@@ -1166,7 +1169,13 @@ function AuthScreen({ onLogin }) {
 
   return (
     <div style={{ position: "relative", minHeight: "100vh", background: "#EEF2F8", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: FB, overflow: "hidden" }}>
-      <SupplyChainBackdrop />
+      <Suspense fallback={<SupplyChainBackdrop />}>
+        <LoginScene3D />
+      </Suspense>
+      <div style={{
+        position: "absolute", inset: 0, zIndex: 0,
+        background: "linear-gradient(115deg, rgba(255,255,255,.9) 0%, rgba(255,255,255,.5) 40%, rgba(255,255,255,.25) 65%, rgba(255,255,255,.85) 100%)",
+      }} />
       <div style={{ position: "relative", zIndex: 1, maxWidth: 420, width: "100%" }}>
         <div style={{ background: LC.card, border: `1px solid ${LC.cardBorder}`, borderRadius: 14, padding: 32, boxShadow: "0 24px 60px rgba(30,39,51,.14)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 4 }}>
@@ -1463,11 +1472,32 @@ function ResourceScreen({ resourceKey, db, user, onCreate, onUpdate, onDelete })
 /* ============================================================================
    OVERVIEW
    ========================================================================== */
+/* Lightweight CSS 3D tilt — no WebGL, safe to use on every card in the app.
+   Tracks pointer position within the element and tilts toward it. */
+function useTilt3D(maxDeg = 7) {
+  const ref = useRef(null);
+  const onMouseMove = useCallback((e) => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width - 0.5;
+    const py = (e.clientY - rect.top) / rect.height - 0.5;
+    el.style.transform = `perspective(800px) rotateX(${(-py * maxDeg).toFixed(2)}deg) rotateY(${(px * maxDeg).toFixed(2)}deg) translateZ(6px)`;
+  }, [maxDeg]);
+  const onMouseLeave = useCallback(() => {
+    const el = ref.current;
+    if (el) el.style.transform = "perspective(800px) rotateX(0deg) rotateY(0deg) translateZ(0px)";
+  }, []);
+  return { ref, onMouseMove, onMouseLeave, style: { transition: "transform .18s ease-out", transformStyle: "preserve-3d", willChange: "transform" } };
+}
+
 function KpiCard({ label, value, unit, tone = C.copper, sub }) {
+  const tilt = useTilt3D(6);
   return (
-    <div style={{
+    <div ref={tilt.ref} onMouseMove={tilt.onMouseMove} onMouseLeave={tilt.onMouseLeave} style={{
       position: "relative", background: C.panel, border: `1px solid ${C.border}`,
       borderTop: `2px solid ${tone}`, borderRadius: 10, padding: "16px 18px", overflow: "hidden",
+      ...tilt.style,
     }}>
       <svg width="30" height="30" viewBox="0 0 30 30" style={{ position: "absolute", top: 0, right: 0, opacity: .45 }}>
         <path d="M30 0 L30 9 L21 9 L21 18 L12 18" stroke={C.copperSoft} strokeWidth="1" fill="none" />
@@ -1576,34 +1606,61 @@ function Overview({ db, user, go }) {
         </div>
       </div>
 
+      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 22, marginBottom: 30 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4, flexWrap: "wrap", gap: 8 }}>
+          <div>
+            <Eyebrow>Interactive</Eyebrow>
+            <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700 }}>Supply chain network — drag to explore</div>
+          </div>
+          <span style={{ fontFamily: FM, fontSize: 10.5, color: C.faint }}>Projects ↔ suppliers, from live purchase orders</span>
+        </div>
+        <div style={{ height: 380, borderRadius: 8, overflow: "hidden", marginTop: 10 }}>
+          <Suspense fallback={
+            <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: C.faint, fontFamily: FM, fontSize: 12 }}>
+              Loading 3D scene…
+            </div>
+          }>
+            <NetworkGraph3D db={db} go={go} />
+          </Suspense>
+        </div>
+      </div>
+
       <Eyebrow>All data categories</Eyebrow>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(215px,1fr))", gap: 13 }}>
-        {cards.map((key) => {
-          const cfg = SCHEMA[key];
-          const Icon = cfg.icon;
-          const canWrite = cfg.writeRoles.includes(user.role);
-          return (
-            <button key={key} onClick={() => go(key)} style={{
-              textAlign: "left", background: C.panel, border: `1px solid ${C.border}`, borderRadius: 11,
-              padding: 16, cursor: "pointer", color: C.text, fontFamily: FB, transition: "border-color .15s",
-            }}
-              onMouseOver={(e) => (e.currentTarget.style.borderColor = C.copperSoft)}
-              onMouseOut={(e) => (e.currentTarget.style.borderColor = C.border)}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 9 }}>
-                <Icon size={17} color={C.copper} />
-                <span style={{ fontFamily: FM, fontSize: 16, color: C.copper, fontWeight: 600 }}>
-                  {db[key].length.toLocaleString()}
-                </span>
-              </div>
-              <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 600, marginBottom: 3 }}>{cfg.label}</div>
-              <div style={{ fontFamily: FM, fontSize: 9.5, color: C.faint }}>
-                {cfg.category.split(".")[0]} · {canWrite ? "editable" : "read-only"}
-              </div>
-            </button>
-          );
-        })}
+        {cards.map((key) => <ResourceCard key={key} resourceKey={key} db={db} user={user} go={go} />)}
       </div>
     </>
+  );
+}
+
+function ResourceCard({ resourceKey, db, user, go }) {
+  const cfg = SCHEMA[resourceKey];
+  const Icon = cfg.icon;
+  const canWrite = cfg.writeRoles.includes(user.role);
+  const tilt = useTilt3D(9);
+  return (
+    <button
+      ref={tilt.ref}
+      onMouseMove={tilt.onMouseMove}
+      onMouseLeave={(e) => { tilt.onMouseLeave(); e.currentTarget.style.borderColor = C.border; }}
+      onMouseOver={(e) => (e.currentTarget.style.borderColor = C.copperSoft)}
+      onClick={() => go(resourceKey)}
+      style={{
+        textAlign: "left", background: C.panel, border: `1px solid ${C.border}`, borderRadius: 11,
+        padding: 16, cursor: "pointer", color: C.text, fontFamily: FB,
+        transition: "border-color .15s, transform .18s ease-out", ...tilt.style,
+      }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 9 }}>
+        <Icon size={17} color={C.copper} />
+        <span style={{ fontFamily: FM, fontSize: 16, color: C.copper, fontWeight: 600 }}>
+          {db[resourceKey].length.toLocaleString()}
+        </span>
+      </div>
+      <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 600, marginBottom: 3 }}>{cfg.label}</div>
+      <div style={{ fontFamily: FM, fontSize: 9.5, color: C.faint }}>
+        {cfg.category.split(".")[0]} · {canWrite ? "editable" : "read-only"}
+      </div>
+    </button>
   );
 }
 
