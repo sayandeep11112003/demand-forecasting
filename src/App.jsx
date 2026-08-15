@@ -12,6 +12,7 @@ import { apiLogin, apiRegister } from "./api.js";
 
 const LoginScene3D = lazy(() => import("./scenes/LoginScene3D.jsx"));
 const NetworkGraph3D = lazy(() => import("./scenes/NetworkGraph3D.jsx"));
+const ForecastBars3D = lazy(() => import("./scenes/ForecastBars3D.jsx"));
 
 /* ============================================================================
    TRAINED MODEL BUNDLE
@@ -1789,6 +1790,25 @@ function Forecasting({ db }) {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 22, marginBottom: 30 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
+          <div>
+            <Eyebrow>Interactive</Eyebrow>
+            <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700 }}>Next month vs. typical — drag to explore, click a bar to select it</div>
+          </div>
+          <span style={{ fontFamily: FM, fontSize: 10.5, color: C.faint }}>Height = forecast ÷ each category's own historical average</span>
+        </div>
+        <div style={{ height: 300, borderRadius: 8, overflow: "hidden", marginTop: 10 }}>
+          <Suspense fallback={
+            <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: C.faint, fontFamily: FM, fontSize: 12 }}>
+              Loading 3D scene…
+            </div>
+          }>
+            <ForecastBars3D categories={MODEL.meta.categories} series={MODEL.demand_forecast.series} cat={cat} onSelect={setCat} />
+          </Suspense>
         </div>
       </div>
 
