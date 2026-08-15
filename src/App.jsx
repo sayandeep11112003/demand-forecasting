@@ -2081,23 +2081,34 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const [entered, setEntered] = useState(null);
 
-  /* Landing → Auth is a real navigation step from the user's point of view,
-     so it needs a browser history entry — otherwise the browser Back button
-     (or a swipe-back gesture) skips straight past this app entirely instead
-     of returning to the landing page. */
+  /* Landing → Auth → Dashboard are each real navigation steps from the
+     user's point of view, so each gets a browser history entry — otherwise
+     the browser Back button (or a swipe-back gesture) skips straight past
+     whichever screen has no entry of its own, including exiting the app
+     entirely once it runs out of entries. */
   const enterAuth = useCallback((mode) => {
     const m = mode || "login";
     window.history.pushState({ entered: m }, "");
     setEntered(m);
   }, []);
   const backToLanding = useCallback(() => {
-    if (window.history.state?.entered) window.history.back();
+    if (window.history.state?.entered || window.history.state?.dashboard) window.history.back();
     else setEntered(null);
   }, []);
   useEffect(() => {
-    const onPopState = (e) => setEntered(e.state?.entered ?? null);
+    const onPopState = (e) => {
+      const state = e.state;
+      if (state?.dashboard) return; // forward/back landed back on the dashboard entry — nothing to change
+      setUser(null); // stepping back out of the dashboard entry means undoing the "login" step
+      setEntered(state?.entered ?? null);
+    };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+  const handleLogin = useCallback((u) => {
+    window.history.pushState({ dashboard: true }, "");
+    setUser(u);
+    setRoute("overview");
   }, []);
 
   const flash = useCallback((msg) => {
@@ -2159,7 +2170,7 @@ export default function App() {
       );
     }
     return (
-      <AuthScreen onLogin={(u) => { setUser(u); setRoute("overview"); }} onBack={backToLanding} initialMode={entered} />
+      <AuthScreen onLogin={handleLogin} onBack={backToLanding} initialMode={entered} />
     );
   }
 
