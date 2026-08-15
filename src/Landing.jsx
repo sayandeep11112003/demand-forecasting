@@ -175,6 +175,58 @@ function Hero({ onEnter }) {
   );
 }
 
+function VideoShowcase() {
+  const sectionRef = useRef(null);
+  const videoRef = useRef(null);
+
+  useEffect(() => {
+    const ctx = gsap.context(() => {
+      gsap.fromTo(videoRef.current, { scale: 1.15 }, {
+        scale: 1, ease: "none",
+        scrollTrigger: { trigger: sectionRef.current, start: "top bottom", end: "top top", scrub: true },
+      });
+    }, sectionRef);
+    return () => ctx.revert();
+  }, []);
+
+  return (
+    <section ref={sectionRef} style={{
+      position: "relative", height: "100vh", scrollSnapAlign: "start",
+      display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", background: L.void,
+    }}>
+      <video
+        ref={videoRef}
+        src="/scene/truck-network.mp4"
+        poster="/scene/truck-network-poster.jpg"
+        autoPlay muted loop playsInline preload="auto"
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+      />
+      <div style={{
+        position: "absolute", inset: 0,
+        background: "linear-gradient(180deg, rgba(7,11,18,.55) 0%, rgba(7,11,18,.15) 35%, rgba(7,11,18,.25) 65%, rgba(7,11,18,.88) 100%)",
+      }} />
+      <div style={{ position: "relative", zIndex: 1, textAlign: "center", maxWidth: 720, padding: "0 24px" }}>
+        <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.6 }}
+          transition={{ duration: 0.6 }}
+          style={{ fontFamily: FM, fontSize: 11.5, letterSpacing: ".14em", color: L.cyan, textTransform: "uppercase", marginBottom: 16 }}>
+          Live Fleet Intelligence
+        </motion.div>
+        <motion.h2 initial={{ opacity: 0, y: 22 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.6 }}
+          transition={{ duration: 0.7, delay: 0.08 }}
+          style={{ fontFamily: FD, fontSize: "clamp(26px,4vw,42px)", fontWeight: 700, color: L.text, margin: "0 0 16px", lineHeight: 1.15 }}>
+          Every shipment, every route,<br />mapped as it moves
+        </motion.h2>
+        <motion.p initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.6 }}
+          transition={{ duration: 0.6, delay: 0.16 }}
+          style={{ fontFamily: FB, fontSize: 15, color: L.muted, lineHeight: 1.6 }}>
+          From a single delivery to your entire distribution network — the same live data that powers the
+          isolation-forest anomaly monitor and the 3D network graph inside the platform.
+        </motion.p>
+      </div>
+    </section>
+  );
+}
+
 function CapabilityStrip() {
   const items = ["Random Forest", "Isolation Forest", "Three.js / WebGL", "Real-Time Monitoring", "Resend Email", "Role-Based Access"];
   return (
@@ -353,6 +405,7 @@ export default function Landing({ onEnter, model }) {
       `}</style>
       <Nav onEnter={onEnter} />
       <Hero onEnter={onEnter} />
+      <VideoShowcase />
       <CapabilityStrip />
       <Features />
       <HowItWorks />
