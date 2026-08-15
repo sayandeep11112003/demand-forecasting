@@ -171,33 +171,14 @@ function InteractiveNetwork() {
 export default function LoginScene3D() {
   return (
     <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
-      {/* Two photos as distinct layers — a diagonal split, each fully sharp
-          (no blur/opacity blending). The live network layer on top is what
-          visually bridges them into one scene. */}
-      <img
-        src="/scene/grid-network.jpg"
-        alt=""
-        style={{
-          position: "absolute", inset: 0, width: "100%", height: "100%",
-          objectFit: "cover", objectPosition: "60% 40%",
-          clipPath: "polygon(0 0, 60% 0, 44% 100%, 0 100%)",
-        }}
-      />
       <img
         src="/scene/port-network.jpg"
         alt=""
         style={{
           position: "absolute", inset: 0, width: "100%", height: "100%",
           objectFit: "cover", objectPosition: "50% 35%",
-          clipPath: "polygon(60% 0, 100% 0, 100% 100%, 44% 100%)",
         }}
       />
-      <div style={{
-        position: "absolute", inset: 0,
-        clipPath: "polygon(59.3% 0, 60.7% 0, 44.7% 100%, 43.3% 100%)",
-        background: "linear-gradient(180deg, rgba(55,231,240,.9), rgba(55,231,240,.25) 45%, rgba(55,231,240,.9))",
-        filter: "blur(1.5px)", opacity: 0.85,
-      }} />
       <Canvas
         orthographic
         camera={{ zoom: 48, position: [0, 0, 10] }}
