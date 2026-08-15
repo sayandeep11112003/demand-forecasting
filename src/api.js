@@ -22,3 +22,7 @@ export async function apiLogin(payload) {
   const data = await request("/api/auth/login", payload);
   return data.user;
 }
+
+export async function apiContact(payload) {
+  return request("/api/contact", payload);
+}

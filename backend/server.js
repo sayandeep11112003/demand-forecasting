@@ -144,6 +144,33 @@ function htmlPage(title, body) {
 
 app.get("/api/health", (req, res) => res.json({ ok: true }));
 
+app.post("/api/contact", async (req, res) => {
+  try {
+    const { name, email, message } = req.body || {};
+    if (!name || !String(name).trim()) return res.status(400).json({ error: "Name is required." });
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "A valid email is required." });
+    if (!message || !String(message).trim()) return res.status(400).json({ error: "Message is required." });
+
+    await sendMail({
+      to: ADMIN_EMAIL,
+      subject: `Demand Forecasting: new contact form message from ${esc(String(name).trim())}`,
+      html: `
+        <p>New message from the landing page contact form.</p>
+        <ul>
+          <li><b>Name:</b> ${esc(String(name).trim())}</li>
+          <li><b>Email:</b> ${esc(String(email).trim())}</li>
+        </ul>
+        <p style="white-space:pre-wrap">${esc(String(message).trim())}</p>
+      `,
+    });
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("contact error:", err);
+    res.status(500).json({ error: "Could not send your message. Please try again." });
+  }
+});
+
 app.post("/api/auth/register", async (req, res) => {
   try {
     const { full_name, email, password, role, department } = req.body || {};

@@ -4,8 +4,9 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import {
   Zap, TrendingUp, Activity, Boxes, SlidersHorizontal, ShieldCheck,
-  ArrowRight, ChevronDown,
+  ArrowRight, ChevronDown, Code2, Send,
 } from "lucide-react";
+import { apiContact } from "./api.js";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -385,8 +386,103 @@ function FinalCTA({ onEnter }) {
           }}>Register a New Account</motion.button>
         </div>
       </motion.div>
-      <div style={{ marginTop: 70, fontFamily: FM, fontSize: 11, color: L.faint }}>
-        Demand Forecasting — built on Random Forest, Isolation Forest and Three.js
+    </section>
+  );
+}
+
+function Footer({ onEnter }) {
+  const [form, setForm] = useState({ name: "", email: "", message: "" });
+  const [status, setStatus] = useState("idle"); // idle | sending | sent | error
+  const [error, setError] = useState(null);
+
+  async function submit(e) {
+    e.preventDefault();
+    setStatus("sending");
+    setError(null);
+    try {
+      await apiContact(form);
+      setStatus("sent");
+      setForm({ name: "", email: "", message: "" });
+    } catch (ex) {
+      setStatus("error");
+      setError(ex.message);
+    }
+  }
+
+  const linkStyle = { display: "block", color: L.muted, fontFamily: FB, fontSize: 13.5, textDecoration: "none", marginBottom: 10 };
+  const fieldStyle = {
+    width: "100%", background: L.void, border: `1px solid ${L.border}`, borderRadius: 8,
+    color: L.text, padding: "9px 11px", fontSize: 13, fontFamily: FB, outline: "none",
+  };
+
+  return (
+    <section style={{ padding: "40px 24px 60px", background: L.void }}>
+      <div style={{
+        maxWidth: 1180, margin: "0 auto", background: L.panel, border: `1px solid ${L.border}`,
+        borderRadius: 28, padding: "50px 48px 30px",
+      }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1.3fr 0.8fr 0.8fr 1.3fr", gap: 40, marginBottom: 40 }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+              <Zap size={19} color={L.copper} />
+              <span style={{ fontFamily: FD, fontWeight: 700, fontSize: 16, color: L.text }}>Demand Forecasting</span>
+            </div>
+            <p style={{ fontFamily: FB, fontSize: 13, color: L.muted, lineHeight: 1.6, maxWidth: 260, margin: "0 0 20px" }}>
+              AI-powered demand forecasting and real-time supply chain monitoring for transmission infrastructure.
+            </p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <a href="https://github.com/sayandeep11112003/demand-forecasting" target="_blank" rel="noreferrer" title="View source on GitHub" style={{
+                width: 34, height: 34, borderRadius: "50%", background: L.void, border: `1px solid ${L.border}`,
+                display: "flex", alignItems: "center", justifyContent: "center", color: L.text,
+              }}><Code2 size={16} /></a>
+            </div>
+          </div>
+
+          <div>
+            <div style={{ fontFamily: FM, fontSize: 10.5, letterSpacing: ".1em", color: L.copper, textTransform: "uppercase", marginBottom: 16 }}>Platform</div>
+            <a href="#features" style={linkStyle}>Features</a>
+            <a href="#how" style={linkStyle}>How it works</a>
+            <a href="#stats" style={linkStyle}>Model performance</a>
+          </div>
+
+          <div>
+            <div style={{ fontFamily: FM, fontSize: 10.5, letterSpacing: ".1em", color: L.copper, textTransform: "uppercase", marginBottom: 16 }}>Account</div>
+            <button onClick={() => onEnter("login")} style={{ ...linkStyle, background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>Sign in</button>
+            <button onClick={() => onEnter("register")} style={{ ...linkStyle, background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>Register</button>
+          </div>
+
+          <div>
+            <div style={{ fontFamily: FM, fontSize: 10.5, letterSpacing: ".1em", color: L.copper, textTransform: "uppercase", marginBottom: 16 }}>Get in touch</div>
+            {status === "sent" ? (
+              <div style={{ fontFamily: FB, fontSize: 13, color: L.green, lineHeight: 1.6 }}>
+                Thanks — your message has been sent.
+              </div>
+            ) : (
+              <form onSubmit={submit} style={{ display: "grid", gap: 9 }}>
+                <input required placeholder="Name" value={form.name} style={fieldStyle}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+                <input required type="email" placeholder="Email" value={form.email} style={fieldStyle}
+                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
+                <textarea required placeholder="Message" value={form.message} rows={3}
+                  style={{ ...fieldStyle, resize: "vertical" }}
+                  onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))} />
+                {error && <div style={{ fontFamily: FB, fontSize: 12, color: "#D9705F" }}>{error}</div>}
+                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} type="submit" disabled={status === "sending"} style={{
+                  background: L.copper, border: "none", color: L.void, fontFamily: FB, fontWeight: 600, fontSize: 13,
+                  padding: "9px 14px", borderRadius: 7, cursor: status === "sending" ? "not-allowed" : "pointer",
+                  opacity: status === "sending" ? 0.6 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+                }}>
+                  {status === "sending" ? "Sending…" : <>Send <Send size={13} /></>}
+                </motion.button>
+              </form>
+            )}
+          </div>
+        </div>
+
+        <div style={{ borderTop: `1px solid ${L.border}`, paddingTop: 22, display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+          <span style={{ fontFamily: FM, fontSize: 11, color: L.faint }}>© 2026 Demand Forecasting — a supply-chain AI prototype.</span>
+          <span style={{ fontFamily: FM, fontSize: 11, color: L.faint }}>Built on Random Forest, Isolation Forest &amp; Three.js</span>
+        </div>
       </div>
     </section>
   );
@@ -411,6 +507,7 @@ export default function Landing({ onEnter, model }) {
       <HowItWorks />
       <StatsSection model={model} />
       <FinalCTA onEnter={onEnter} />
+      <Footer onEnter={onEnter} />
     </div>
   );
 }
