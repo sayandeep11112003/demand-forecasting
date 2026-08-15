@@ -1466,15 +1466,23 @@ function ResourceScreen({ resourceKey, db, user, onCreate, onUpdate, onDelete })
    Tracks pointer position within the element and tilts toward it. */
 function useTilt3D(maxDeg = 7) {
   const ref = useRef(null);
+  const rafRef = useRef(0);
   const onMouseMove = useCallback((e) => {
     const el = ref.current;
     if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const px = (e.clientX - rect.left) / rect.width - 0.5;
-    const py = (e.clientY - rect.top) / rect.height - 0.5;
-    el.style.transform = `perspective(800px) rotateX(${(-py * maxDeg).toFixed(2)}deg) rotateY(${(px * maxDeg).toFixed(2)}deg) translateZ(6px)`;
+    const clientX = e.clientX, clientY = e.clientY;
+    if (rafRef.current) return; // one pending update per frame, regardless of event rate
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = 0;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const px = (clientX - rect.left) / rect.width - 0.5;
+      const py = (clientY - rect.top) / rect.height - 0.5;
+      el.style.transform = `perspective(800px) rotateX(${(-py * maxDeg).toFixed(2)}deg) rotateY(${(px * maxDeg).toFixed(2)}deg) translateZ(6px)`;
+    });
   }, [maxDeg]);
   const onMouseLeave = useCallback(() => {
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = 0; }
     const el = ref.current;
     if (el) el.style.transform = "perspective(800px) rotateX(0deg) rotateY(0deg) translateZ(0px)";
   }, []);
@@ -1944,7 +1952,7 @@ function buildAnomalyFeed(db) {
 
   const scoreGroup = (rows) => {
     if (rows.length < 8) return rows.map((r) => ({ ...r, score: 0 }));
-    const scores = isolationForestScores(rows.map((r) => r.vector), { nTrees: 80, sampleSize: Math.min(128, rows.length) });
+    const scores = isolationForestScores(rows.map((r) => r.vector), { nTrees: 40, sampleSize: Math.min(80, rows.length) });
     return rows.map((r, i) => ({ ...r, score: scores[i] }));
   };
 
@@ -1981,16 +1989,28 @@ function buildAnomalyFeed(db) {
 }
 
 function Monitoring({ db, user, onCreate, onSimulateEvent }) {
-  const [tick, setTick] = useState(0);
+  const [anomalies, setAnomalies] = useState([]);
   const [loggedIds, setLoggedIds] = useState(() => new Set());
+  const [rescoreTick, setRescoreTick] = useState(0);
 
   useEffect(() => {
-    const rescoreTimer = setInterval(() => setTick((t) => t + 1), 4000);
+    const rescoreTimer = setInterval(() => setRescoreTick((n) => n + 1), 6000);
     const eventTimer = setInterval(() => onSimulateEvent(), 9000);
     return () => { clearInterval(rescoreTimer); clearInterval(eventTimer); };
   }, [onSimulateEvent]);
 
-  const anomalies = useMemo(() => buildAnomalyFeed(db), [db, tick]);
+  // Isolation-forest scoring is real CPU work (tree-building over up to a few
+  // hundred rows) — run it off the render's critical path via
+  // requestIdleCallback so it can't cause a dropped frame, instead of tying
+  // it to useMemo (which would block the commit that triggered it).
+  useEffect(() => {
+    let cancelled = false;
+    const ric = window.requestIdleCallback || ((fn) => setTimeout(fn, 1));
+    const cic = window.cancelIdleCallback || clearTimeout;
+    const handle = ric(() => { if (!cancelled) setAnomalies(buildAnomalyFeed(db)); });
+    return () => { cancelled = true; cic(handle); };
+  }, [db, rescoreTick]);
+
   const canRespond = SCHEMA.disruptions.writeRoles.includes(user.role);
 
   function respond(a) {
