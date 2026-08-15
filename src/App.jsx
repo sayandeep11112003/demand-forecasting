@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef, Suspense, lazy } from "react";
+import { motion } from "framer-motion";
 import {
   ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Cell, LabelList,
@@ -880,15 +881,6 @@ function EmptyState({ children }) {
 /* ============================================================================
    AUTH SCREEN
    ========================================================================== */
-/* Light palette used only on the login/register screen — the rest of the
-   app stays on the dark "Grid Current" theme (C) defined above. */
-const LC = {
-  text: "#1E2733", muted: "#64748B", faint: "#94A3B8",
-  card: "#FFFFFF", cardBorder: "#E2E8F0",
-  inputBg: "#F8FAFC", inputBorder: "#DCE3EC",
-  copper: "#C1793C", cyan: "#2694AE", green: "#2F9E6E", red: "#D8524A",
-};
-
 function SupplyChainBackdrop() {
   const towerX = [70, 330, 590, 850, 1110];
   return (
@@ -1108,22 +1100,6 @@ function SupplyChainBackdrop() {
   );
 }
 
-const lightInputStyle = {
-  width: "100%", background: LC.inputBg, border: `1px solid ${LC.inputBorder}`, borderRadius: 8,
-  color: LC.text, padding: "10px 12px", fontSize: 13.5, fontFamily: FB, outline: "none",
-};
-
-function LightField({ label, children }) {
-  return (
-    <div>
-      <label style={{ fontFamily: FM, fontSize: 10.5, color: LC.muted, textTransform: "uppercase", letterSpacing: ".05em", display: "block", marginBottom: 6 }}>
-        {label}
-      </label>
-      {children}
-    </div>
-  );
-}
-
 function AuthScreen({ onLogin, onBack, initialMode }) {
   const [mode, setMode] = useState(initialMode === "register" ? "register" : "login");
   const [email, setEmail] = useState("");
@@ -1170,87 +1146,90 @@ function AuthScreen({ onLogin, onBack, initialMode }) {
   }
 
   return (
-    <div style={{ position: "relative", minHeight: "100vh", background: "#EEF2F8", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: FB, overflow: "hidden" }}>
+    <div style={{ position: "relative", minHeight: "100vh", background: C.void, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: FB, overflow: "hidden" }}>
       <Suspense fallback={<SupplyChainBackdrop />}>
         <LoginScene3D />
       </Suspense>
       <div style={{
         position: "absolute", inset: 0, zIndex: 0, pointerEvents: "none",
-        background: "radial-gradient(ellipse at 50% 50%, rgba(8,12,20,.22) 0%, rgba(8,12,20,.5) 75%, rgba(8,12,20,.68) 100%)",
+        background: "radial-gradient(ellipse at 50% 50%, rgba(7,11,18,.35) 0%, rgba(7,11,18,.62) 70%, rgba(7,11,18,.85) 100%)",
       }} />
       <div style={{ position: "relative", zIndex: 1, maxWidth: 420, width: "100%" }}>
         {onBack && (
-          <button onClick={onBack} style={{
-            background: "none", border: "none", color: "#FFFFFF", fontFamily: FB, fontSize: 12.5,
-            cursor: "pointer", marginBottom: 14, padding: 0, opacity: 0.85, textShadow: "0 1px 4px rgba(0,0,0,.5)",
-          }}>← Back to home</button>
+          <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}
+            onClick={onBack} style={{
+              background: "none", border: "none", color: C.muted, fontFamily: FB, fontSize: 12.5,
+              cursor: "pointer", marginBottom: 14, padding: 0,
+            }}>← Back to home</motion.button>
         )}
-        <div style={{
-          background: "rgba(255,255,255,.87)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
-          border: `1px solid ${LC.cardBorder}`, borderRadius: 14, padding: 32, boxShadow: "0 24px 60px rgba(8,12,20,.35)",
+        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} style={{
+          background: "rgba(15,20,28,.82)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+          border: `1px solid ${C.border}`, borderRadius: 14, padding: 32, boxShadow: "0 24px 70px rgba(0,0,0,.5)",
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 4 }}>
-            <Zap size={20} color={LC.copper} />
-            <span style={{ fontFamily: FD, fontWeight: 700, fontSize: 18, color: LC.text }}>Demand Forecasting</span>
-          </div>
-          <p style={{ color: LC.muted, fontSize: 13, margin: "0 0 24px" }}>
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }}
+            style={{ fontFamily: FM, fontSize: 10.5, letterSpacing: ".14em", color: C.cyan, textTransform: "uppercase", marginBottom: 12 }}>
+            Secure Access Portal
+          </motion.div>
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.16 }}
+            style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 4 }}>
+            <Zap size={20} color={C.copper} />
+            <span style={{ fontFamily: FD, fontWeight: 700, fontSize: 18, color: C.text }}>Demand Forecasting</span>
+          </motion.div>
+          <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}
+            style={{ color: C.muted, fontSize: 13, margin: "0 0 24px" }}>
             {mode === "login" ? "Sign in to the decision-support system." : "Create an account — an administrator must verify it before you can sign in."}
-          </p>
+          </motion.p>
 
           {err && (
-            <div style={{ background: `${LC.red}14`, border: `1px solid ${LC.red}55`, color: LC.red, borderRadius: 8, padding: "10px 13px", fontSize: 12.5, marginBottom: 16 }}>
+            <div style={{ background: `${C.red}1F`, border: `1px solid ${C.red}66`, color: C.red, borderRadius: 8, padding: "10px 13px", fontSize: 12.5, marginBottom: 16 }}>
               {err}
             </div>
           )}
           {info && (
-            <div style={{ background: `${LC.green}14`, border: `1px solid ${LC.green}55`, color: LC.green, borderRadius: 8, padding: "10px 13px", fontSize: 12.5, marginBottom: 16, lineHeight: 1.5 }}>
+            <div style={{ background: `${C.green}1F`, border: `1px solid ${C.green}66`, color: C.green, borderRadius: 8, padding: "10px 13px", fontSize: 12.5, marginBottom: 16, lineHeight: 1.5 }}>
               {info}
             </div>
           )}
 
-          <form onSubmit={submit} style={{ display: "grid", gap: 14 }}>
+          <motion.form initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.28 }}
+            onSubmit={submit} style={{ display: "grid", gap: 14 }}>
             {mode === "register" && (
-              <LightField label="Full name">
-                <input style={lightInputStyle} value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Your name" />
-              </LightField>
+              <Field label="Full name">
+                <input style={inputStyle} value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Your name" />
+              </Field>
             )}
-            <LightField label="Email">
-              <input style={lightInputStyle} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            </LightField>
-            <LightField label="Password">
-              <input style={lightInputStyle} type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-            </LightField>
+            <Field label="Email">
+              <input style={inputStyle} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </Field>
+            <Field label="Password">
+              <input style={inputStyle} type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            </Field>
             {mode === "register" && (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <LightField label="Role">
-                  <select style={lightInputStyle} value={role} onChange={(e) => setRole(e.target.value)}>
+                <Field label="Role">
+                  <select style={inputStyle} value={role} onChange={(e) => setRole(e.target.value)}>
                     {Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                   </select>
-                </LightField>
-                <LightField label="Department">
-                  <input style={lightInputStyle} value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="Procurement" />
-                </LightField>
+                </Field>
+                <Field label="Department">
+                  <input style={inputStyle} value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="Procurement" />
+                </Field>
               </div>
             )}
-            <button type="submit" disabled={busy} style={{
-              width: "100%", marginTop: 4, background: LC.copper, border: `1px solid ${LC.copper}`, color: "#FFFFFF",
-              fontFamily: FB, fontWeight: 600, fontSize: 13.5, padding: "10px 15px", borderRadius: 8,
-              cursor: busy ? "not-allowed" : "pointer", opacity: busy ? 0.6 : 1, transition: "filter .15s",
-            }}
-              onMouseOver={(e) => !busy && (e.currentTarget.style.filter = "brightness(1.08)")}
-              onMouseOut={(e) => (e.currentTarget.style.filter = "none")}>
+            <Btn type="submit" variant="primary" disabled={busy} style={{ width: "100%", justifyContent: "center", marginTop: 4 }}>
               {busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
-            </button>
-          </form>
+            </Btn>
+          </motion.form>
 
-          <div style={{ marginTop: 18, fontSize: 12.5, color: LC.muted, textAlign: "center" }}>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, delay: 0.4 }}
+            style={{ marginTop: 18, fontSize: 12.5, color: C.muted, textAlign: "center" }}>
             {mode === "login" ? "No account? " : "Already registered? "}
             <button onClick={() => { setMode(mode === "login" ? "register" : "login"); setErr(null); setInfo(null); }}
-              style={{ background: "none", border: "none", color: LC.copper, cursor: "pointer", fontSize: 12.5, padding: 0, fontWeight: 600 }}>
+              style={{ background: "none", border: "none", color: C.copper, cursor: "pointer", fontSize: 12.5, padding: 0, fontWeight: 600 }}>
               {mode === "login" ? "Register" : "Sign in"}
             </button>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       </div>
     </div>
   );
