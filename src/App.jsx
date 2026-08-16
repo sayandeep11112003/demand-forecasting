@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef, Suspense, lazy } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Cell, LabelList,
@@ -37,6 +37,17 @@ const C = {
 const FD = "'Space Grotesk',system-ui,sans-serif";
 const FB = "'Inter',system-ui,sans-serif";
 const FM = "'JetBrains Mono',ui-monospace,monospace";
+
+/* Formal scale tokens — a consistent radius/shadow/focus vocabulary applied
+   across every shared component, so the whole app (not just individual
+   screens) reads as one deliberate system. */
+const RADIUS = { sm: 6, md: 9, lg: 12, xl: 16 };
+const SHADOW = {
+  sm: "0 1px 2px rgba(0,0,0,.3)",
+  md: "0 10px 28px rgba(0,0,0,.35)",
+  lg: "0 26px 60px rgba(0,0,0,.5)",
+};
+const FOCUS_RING = `0 0 0 3px ${C.copper}33`;
 
 /* ============================================================================
    SEEDED PRNG  — deterministic demo data across reloads
@@ -756,8 +767,8 @@ function Pill({ value }) {
   const tone = STATUS_TONE[value] || C.muted;
   return (
     <span style={{
-      fontFamily: FM, fontSize: 10.5, padding: "3px 9px", borderRadius: 20,
-      color: tone, border: `1px solid ${tone}55`, background: `${tone}18`, whiteSpace: "nowrap",
+      fontFamily: FM, fontSize: 10.5, fontWeight: 600, padding: "3px 9px", borderRadius: RADIUS.xl,
+      color: tone, border: `1px solid ${tone}55`, background: `${tone}18`, whiteSpace: "nowrap", letterSpacing: ".01em",
     }}>{value}</span>
   );
 }
@@ -768,8 +779,8 @@ function Meter({ value, max = 100, tone }) {
   const col = tone || (pct >= 80 ? C.green : pct >= 40 ? C.copper : C.amber);
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 96 }}>
-      <div style={{ flex: 1, height: 5, background: C.border, borderRadius: 3, overflow: "hidden" }}>
-        <div style={{ width: pct + "%", height: "100%", background: col, transition: "width .3s" }} />
+      <div style={{ flex: 1, height: 5, background: C.border, borderRadius: RADIUS.sm / 2, overflow: "hidden" }}>
+        <div style={{ width: pct + "%", height: "100%", background: col, transition: "width .35s ease-out", borderRadius: RADIUS.sm / 2 }} />
       </div>
       <span style={{ fontFamily: FM, fontSize: 11, color: C.muted, minWidth: 30 }}>{v}{max === 100 ? "%" : ""}</span>
     </div>
@@ -817,9 +828,9 @@ function Eyebrow({ children }) {
 function Btn({ children, onClick, variant = "ghost", size = "md", disabled, type = "button", style }) {
   const base = {
     fontFamily: FB, fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer",
-    borderRadius: 7, transition: "filter .15s", opacity: disabled ? 0.45 : 1,
-    fontSize: size === "sm" ? 12 : 13.5, padding: size === "sm" ? "5px 10px" : "9px 15px",
-    display: "inline-flex", alignItems: "center", gap: 6,
+    borderRadius: RADIUS.sm, transition: "filter .15s, transform .1s, box-shadow .15s", opacity: disabled ? 0.45 : 1,
+    fontSize: size === "sm" ? 12 : 13.5, padding: size === "sm" ? "6px 11px" : "9px 16px",
+    display: "inline-flex", alignItems: "center", gap: 6, outline: "none",
   };
   const variants = {
     primary: { background: C.copper, border: `1px solid ${C.copper}`, color: C.void },
@@ -830,7 +841,11 @@ function Btn({ children, onClick, variant = "ghost", size = "md", disabled, type
     <button type={type} onClick={onClick} disabled={disabled}
       style={{ ...base, ...variants[variant], ...style }}
       onMouseOver={(e) => !disabled && (e.currentTarget.style.filter = "brightness(1.18)")}
-      onMouseOut={(e) => (e.currentTarget.style.filter = "none")}>
+      onMouseOut={(e) => (e.currentTarget.style.filter = "none")}
+      onMouseDown={(e) => !disabled && (e.currentTarget.style.transform = "scale(.97)")}
+      onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+      onFocus={(e) => !disabled && (e.currentTarget.style.boxShadow = FOCUS_RING)}
+      onBlur={(e) => (e.currentTarget.style.boxShadow = "none")}>
       {children}
     </button>
   );
@@ -848,29 +863,39 @@ function Field({ label, children }) {
 }
 
 const inputStyle = {
-  width: "100%", background: C.panel2, border: `1px solid ${C.border}`, borderRadius: 6,
+  width: "100%", background: C.panel2, border: `1px solid ${C.border}`, borderRadius: RADIUS.sm,
   color: C.text, padding: "9px 11px", fontSize: 13.5, fontFamily: FB, outline: "none",
+  transition: "border-color .15s, box-shadow .15s",
 };
 
 function Modal({ title, children, onClose, width = 720 }) {
   return (
-    <div onClick={onClose} style={{
-      position: "fixed", inset: 0, background: "rgba(5,8,13,.72)", zIndex: 100,
-      display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 20px", overflowY: "auto",
-    }}>
-      <div onClick={(e) => e.stopPropagation()} style={{
-        background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14,
-        width: "100%", maxWidth: width, boxShadow: "0 24px 60px rgba(0,0,0,.5)",
+    <motion.div
+      onClick={onClose}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}
+      style={{
+        position: "fixed", inset: 0, background: "rgba(5,8,13,.72)", zIndex: 100, backdropFilter: "blur(3px)",
+        display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 20px", overflowY: "auto",
       }}>
+      <motion.div
+        onClick={(e) => e.stopPropagation()}
+        initial={{ opacity: 0, y: 14, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: 0.98 }}
+        transition={{ duration: 0.2, ease: "easeOut" }}
+        style={{
+          background: C.panel, border: `1px solid ${C.border}`, borderRadius: RADIUS.xl,
+          width: "100%", maxWidth: width, boxShadow: SHADOW.lg,
+        }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 22px", borderBottom: `1px solid ${C.border}` }}>
           <span style={{ fontFamily: FD, fontSize: 17, fontWeight: 700 }}>{title}</span>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", padding: 4, display: "flex" }}>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", padding: 4, display: "flex", borderRadius: RADIUS.sm, transition: "color .15s, background .15s" }}
+            onMouseOver={(e) => { e.currentTarget.style.color = C.text; e.currentTarget.style.background = C.panel2; }}
+            onMouseOut={(e) => { e.currentTarget.style.color = C.muted; e.currentTarget.style.background = "transparent"; }}>
             <X size={18} />
           </button>
         </div>
         <div style={{ padding: 22 }}>{children}</div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -1365,7 +1390,7 @@ function ResourceScreen({ resourceKey, db, user, onCreate, onUpdate, onDelete })
         )}
       </div>
 
-      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: RADIUS.lg, overflow: "hidden", boxShadow: SHADOW.sm }}>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
@@ -1387,7 +1412,7 @@ function ResourceScreen({ resourceKey, db, user, onCreate, onUpdate, onDelete })
                 </EmptyState></td></tr>
               )}
               {pageRows.map((row) => (
-                <tr key={row[cfg.idKey]}
+                <tr key={row[cfg.idKey]} style={{ transition: "background .12s" }}
                   onMouseOver={(e) => (e.currentTarget.style.background = C.panel2)}
                   onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}>
                   {cfg.columns.map((k) => (
@@ -1399,11 +1424,15 @@ function ResourceScreen({ resourceKey, db, user, onCreate, onUpdate, onDelete })
                     <td style={{ padding: "10px 14px", borderBottom: `1px solid ${C.borderSoft}` }}>
                       <div style={{ display: "flex", gap: 6 }}>
                         <button onClick={() => setEditing(row)} title="Edit"
-                          style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", padding: 3, display: "flex" }}>
+                          style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", padding: 5, display: "flex", borderRadius: RADIUS.sm, transition: "color .15s, background .15s" }}
+                          onMouseOver={(e) => { e.currentTarget.style.color = C.copper; e.currentTarget.style.background = `${C.copper}18`; }}
+                          onMouseOut={(e) => { e.currentTarget.style.color = C.muted; e.currentTarget.style.background = "transparent"; }}>
                           <Pencil size={14} />
                         </button>
                         <button onClick={() => setConfirmDel(row)} title="Delete"
-                          style={{ background: "none", border: "none", color: C.red, cursor: "pointer", padding: 3, display: "flex" }}>
+                          style={{ background: "none", border: "none", color: C.red, cursor: "pointer", padding: 5, display: "flex", borderRadius: RADIUS.sm, transition: "background .15s" }}
+                          onMouseOver={(e) => (e.currentTarget.style.background = `${C.red}18`)}
+                          onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}>
                           <Trash2 size={14} />
                         </button>
                       </div>
@@ -1428,32 +1457,36 @@ function ResourceScreen({ resourceKey, db, user, onCreate, onUpdate, onDelete })
         </div>
       </div>
 
-      {editing && (
-        <Modal title={editing === "new" ? `New ${cfg.label.replace(/s$/, "")}` : `Edit ${cfg.label.replace(/s$/, "")}`}
-          onClose={() => setEditing(null)}>
-          <RecordForm resourceKey={resourceKey} record={editing === "new" ? null : editing} db={db}
-            onCancel={() => setEditing(null)}
-            onSave={(vals) => {
-              if (editing === "new") onCreate(resourceKey, vals);
-              else onUpdate(resourceKey, editing[cfg.idKey], vals);
-              setEditing(null);
-            }} />
-        </Modal>
-      )}
+      <AnimatePresence>
+        {editing && (
+          <Modal key="edit-modal" title={editing === "new" ? `New ${cfg.label.replace(/s$/, "")}` : `Edit ${cfg.label.replace(/s$/, "")}`}
+            onClose={() => setEditing(null)}>
+            <RecordForm resourceKey={resourceKey} record={editing === "new" ? null : editing} db={db}
+              onCancel={() => setEditing(null)}
+              onSave={(vals) => {
+                if (editing === "new") onCreate(resourceKey, vals);
+                else onUpdate(resourceKey, editing[cfg.idKey], vals);
+                setEditing(null);
+              }} />
+          </Modal>
+        )}
+      </AnimatePresence>
 
-      {confirmDel && (
-        <Modal title="Delete record" onClose={() => setConfirmDel(null)} width={430}>
-          <p style={{ fontSize: 13.5, color: C.muted, lineHeight: 1.6, margin: "0 0 20px" }}>
-            Permanently delete this record? This cannot be undone.
-          </p>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-            <Btn onClick={() => setConfirmDel(null)}>Cancel</Btn>
-            <Btn variant="danger" onClick={() => { onDelete(resourceKey, confirmDel[cfg.idKey]); setConfirmDel(null); }}>
-              <Trash2 size={13} /> Delete
-            </Btn>
-          </div>
-        </Modal>
-      )}
+      <AnimatePresence>
+        {confirmDel && (
+          <Modal key="delete-modal" title="Delete record" onClose={() => setConfirmDel(null)} width={430}>
+            <p style={{ fontSize: 13.5, color: C.muted, lineHeight: 1.6, margin: "0 0 20px" }}>
+              Permanently delete this record? This cannot be undone.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <Btn onClick={() => setConfirmDel(null)}>Cancel</Btn>
+              <Btn variant="danger" onClick={() => { onDelete(resourceKey, confirmDel[cfg.idKey]); setConfirmDel(null); }}>
+                <Trash2 size={13} /> Delete
+              </Btn>
+            </div>
+          </Modal>
+        )}
+      </AnimatePresence>
     </>
   );
 }
@@ -1494,7 +1527,8 @@ function KpiCard({ label, value, unit, tone = C.copper, sub }) {
   return (
     <div ref={tilt.ref} onMouseMove={tilt.onMouseMove} onMouseLeave={tilt.onMouseLeave} style={{
       position: "relative", background: C.panel, border: `1px solid ${C.border}`,
-      borderTop: `2px solid ${tone}`, borderRadius: 10, padding: "16px 18px", overflow: "hidden",
+      borderTop: `2px solid ${tone}`, borderRadius: RADIUS.lg, padding: "16px 18px", overflow: "hidden",
+      boxShadow: SHADOW.sm, transition: "box-shadow .2s",
       ...tilt.style,
     }}>
       <svg width="30" height="30" viewBox="0 0 30 30" style={{ position: "absolute", top: 0, right: 0, opacity: .45 }}>
@@ -1871,7 +1905,7 @@ function Forecasting({ db }) {
       {/* supplier risk */}
       <Eyebrow>Risk ranking</Eyebrow>
       <h2 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, margin: "0 0 14px" }}>Supplier risk table</h2>
-      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: RADIUS.lg, overflow: "hidden", boxShadow: SHADOW.sm }}>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
@@ -2207,7 +2241,7 @@ export default function App() {
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
         * { box-sizing: border-box; }
         ::selection { background: ${C.copper}; color: #000; }
-        input:focus, select:focus, textarea:focus { outline: 2px solid ${C.copper}; outline-offset: 1px; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: ${C.copper}88; box-shadow: ${FOCUS_RING}; }
         input[type=range] { -webkit-appearance: none; appearance: none; height: 4px; border-radius: 2px; background: ${C.border}; }
         input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: ${C.copper}; cursor: pointer; border: 2px solid ${C.void}; }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
@@ -2232,13 +2266,18 @@ export default function App() {
             const active = route === key;
             return (
               <button key={key} onClick={() => setRoute(key)} style={{
-                display: "flex", alignItems: "center", gap: 9, width: "100%", textAlign: "left",
-                padding: "8px 11px", borderRadius: 7, marginBottom: 2, cursor: "pointer", fontFamily: FB,
-                fontSize: 12.8, fontWeight: active ? 600 : 500,
+                position: "relative", display: "flex", alignItems: "center", gap: 9, width: "100%", textAlign: "left",
+                padding: "8px 11px", borderRadius: RADIUS.sm, marginBottom: 2, cursor: "pointer", fontFamily: FB,
+                fontSize: 12.8, fontWeight: active ? 600 : 500, transition: "background .15s, color .15s",
                 background: active ? C.panel2 : "transparent",
                 color: active ? C.copper : C.muted,
                 border: `1px solid ${active ? C.border : "transparent"}`,
-              }}>
+              }}
+                onMouseOver={(e) => !active && (e.currentTarget.style.color = C.text)}
+                onMouseOut={(e) => !active && (e.currentTarget.style.color = C.muted)}>
+                {active && (
+                  <span style={{ position: "absolute", left: -13, top: "50%", transform: "translateY(-50%)", width: 3, height: 16, borderRadius: 2, background: C.copper }} />
+                )}
                 <Icon size={14} />
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
               </button>
@@ -2289,8 +2328,8 @@ export default function App() {
         <div style={{
           position: "fixed", bottom: 22, left: "50%", transform: "translateX(-50%)",
           background: C.panel2, border: `1px solid ${C.copper}66`, color: C.text,
-          padding: "10px 18px", borderRadius: 9, fontSize: 13, zIndex: 200,
-          animation: "slideUp .2s ease-out", boxShadow: "0 8px 28px rgba(0,0,0,.45)",
+          padding: "10px 18px", borderRadius: RADIUS.md, fontSize: 13, zIndex: 200,
+          animation: "slideUp .2s ease-out", boxShadow: SHADOW.md,
         }}>{toast}</div>
       )}
     </div>
