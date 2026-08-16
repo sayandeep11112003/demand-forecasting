@@ -7,7 +7,7 @@ import {
 import {
   Zap, LayoutGrid, FolderKanban, Factory, ScrollText, Package, Truck, ClipboardCheck,
   HardHat, Warehouse, IndianRupee, AlertTriangle, Leaf, Users, TrendingUp, Activity,
-  Plus, Pencil, Trash2, X, LogOut, Search, Lock,
+  Plus, Pencil, Trash2, X, LogOut, Search, Lock, Inbox,
 } from "lucide-react";
 import { apiLogin, apiRegister } from "./api.js";
 
@@ -869,6 +869,28 @@ const inputStyle = {
 };
 
 function Modal({ title, children, onClose, width = 720 }) {
+  const dialogRef = useRef(null);
+
+  useEffect(() => {
+    const prevActive = document.activeElement;
+    dialogRef.current?.focus();
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "Tab") {
+        const focusables = dialogRef.current?.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+        if (!focusables || focusables.length === 0) return;
+        const first = focusables[0], last = focusables[focusables.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      prevActive?.focus?.();
+    };
+  }, [onClose]);
+
   return (
     <motion.div
       onClick={onClose}
@@ -878,12 +900,13 @@ function Modal({ title, children, onClose, width = 720 }) {
         display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 20px", overflowY: "auto",
       }}>
       <motion.div
+        ref={dialogRef} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         initial={{ opacity: 0, y: 14, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: 0.98 }}
         transition={{ duration: 0.2, ease: "easeOut" }}
         style={{
           background: C.panel, border: `1px solid ${C.border}`, borderRadius: RADIUS.xl,
-          width: "100%", maxWidth: width, boxShadow: SHADOW.lg,
+          width: "100%", maxWidth: width, boxShadow: SHADOW.lg, outline: "none",
         }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 22px", borderBottom: `1px solid ${C.border}` }}>
           <span style={{ fontFamily: FD, fontSize: 17, fontWeight: 700 }}>{title}</span>
@@ -900,7 +923,17 @@ function Modal({ title, children, onClose, width = 720 }) {
 }
 
 function EmptyState({ children }) {
-  return <div style={{ padding: 46, textAlign: "center", color: C.muted, fontSize: 13.5 }}>{children}</div>;
+  return (
+    <div style={{ padding: "52px 20px", textAlign: "center" }}>
+      <div style={{
+        width: 42, height: 42, borderRadius: "50%", background: C.panel2, border: `1px solid ${C.border}`,
+        display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px",
+      }}>
+        <Inbox size={18} color={C.faint} />
+      </div>
+      <div style={{ color: C.muted, fontSize: 13.5 }}>{children}</div>
+    </div>
+  );
 }
 
 /* ============================================================================
@@ -1594,7 +1627,7 @@ function Overview({ db, user, go }) {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginBottom: 30 }}>
-        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 22 }}>
+        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: RADIUS.lg, padding: 22 }}>
           <Eyebrow>Delivery performance</Eyebrow>
           <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Where deliveries land</div>
           <p style={{ fontSize: 12, color: C.muted, margin: "0 0 14px" }}>
@@ -1613,7 +1646,7 @@ function Overview({ db, user, go }) {
           </ResponsiveContainer>
         </div>
 
-        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 22 }}>
+        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: RADIUS.lg, padding: 22 }}>
           <Eyebrow>Highest-risk suppliers</Eyebrow>
           <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, marginBottom: 14 }}>Risk ranking (top 5)</div>
           <div style={{ display: "grid", gap: 9 }}>
@@ -1638,7 +1671,7 @@ function Overview({ db, user, go }) {
         </div>
       </div>
 
-      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 22, marginBottom: 30 }}>
+      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: RADIUS.lg, padding: 22, marginBottom: 30 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4, flexWrap: "wrap", gap: 8 }}>
           <div>
             <Eyebrow>Interactive</Eyebrow>
@@ -1754,7 +1787,7 @@ function Forecasting({ db }) {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1.55fr 1fr", gap: 18, marginBottom: 30 }}>
-        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 22 }}>
+        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: RADIUS.lg, padding: 22 }}>
           <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
             <div>
               <Eyebrow>Demand forecast</Eyebrow>
@@ -1799,7 +1832,7 @@ function Forecasting({ db }) {
           </div>
         </div>
 
-        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 22 }}>
+        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: RADIUS.lg, padding: 22 }}>
           <Eyebrow>Delay model — drivers</Eyebrow>
           <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, marginBottom: 14 }}>What predicts a delay</div>
           <ResponsiveContainer width="100%" height={272}>
@@ -1821,7 +1854,7 @@ function Forecasting({ db }) {
         </div>
       </div>
 
-      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 22, marginBottom: 30 }}>
+      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: RADIUS.lg, padding: 22, marginBottom: 30 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
           <div>
             <Eyebrow>Interactive</Eyebrow>
@@ -1844,7 +1877,7 @@ function Forecasting({ db }) {
       <Eyebrow>Interactive</Eyebrow>
       <h2 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, margin: "0 0 16px" }}>What-if delay estimator</h2>
       <div style={{
-        background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 24,
+        background: C.panel, border: `1px solid ${C.border}`, borderRadius: RADIUS.lg, padding: 24,
         display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 26, marginBottom: 30,
       }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
@@ -2312,15 +2345,21 @@ export default function App() {
         </div>
 
         <div style={{ flex: 1, padding: 26, maxWidth: 1380, width: "100%", margin: "0 auto" }}>
-          {route === "overview" && <Overview db={db} user={user} go={setRoute} />}
-          {route === "forecasting" && <Forecasting db={db} />}
-          {route === "monitoring" && (
-            <Monitoring db={db} user={user} onCreate={createRecord} onSimulateEvent={simulateLiveEvent} />
-          )}
-          {SCHEMA[route] && (
-            <ResourceScreen resourceKey={route} db={db} user={user}
-              onCreate={createRecord} onUpdate={updateRecord} onDelete={deleteRecord} />
-          )}
+          <AnimatePresence mode="wait">
+            <motion.div key={route}
+              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}>
+              {route === "overview" && <Overview db={db} user={user} go={setRoute} />}
+              {route === "forecasting" && <Forecasting db={db} />}
+              {route === "monitoring" && (
+                <Monitoring db={db} user={user} onCreate={createRecord} onSimulateEvent={simulateLiveEvent} />
+              )}
+              {SCHEMA[route] && (
+                <ResourceScreen resourceKey={route} db={db} user={user}
+                  onCreate={createRecord} onUpdate={updateRecord} onDelete={deleteRecord} />
+              )}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </div>
 
