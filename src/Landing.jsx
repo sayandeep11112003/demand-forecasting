@@ -26,8 +26,8 @@ const FM = "'JetBrains Mono',ui-monospace,monospace";
 
 const FEATURES = [
   { Icon: TrendingUp, title: "AI Demand Forecasting", body: "Trend/seasonality models project 6-month demand per material category, with confidence bands built from real forecast error." },
-  { Icon: Activity, title: "Delay Risk Prediction", body: "A random-forest model scores every shipment against distance, transport mode and supplier history before it's late." },
-  { Icon: ShieldCheck, title: "Real-Time Anomaly Monitor", body: "A genuine isolation-forest ensemble rescoring every few seconds, flagging outlier POs and shipments as they happen." },
+  { Icon: Activity, title: "Delay Risk Prediction", body: "Every shipment is scored against distance, transport mode and supplier history to flag risk before it's late." },
+  { Icon: ShieldCheck, title: "Real-Time Anomaly Monitor", body: "A live scoring engine rescoring every few seconds, flagging outlier POs and shipments the moment they happen." },
   { Icon: Boxes, title: "Interactive 3D Network", body: "Drag-to-orbit visualization of every supplier-project relationship, built from live purchase-order data, not a mockup." },
   { Icon: SlidersHorizontal, title: "What-If Simulator", body: "Adjust category, region, transport mode and urgency and watch the interpretable delay estimate update instantly." },
   { Icon: Zap, title: "Role-Based Governance", body: "Six roles gate what's editable across all twelve data categories, from procurement to sustainability reporting." },
@@ -221,7 +221,7 @@ function VideoShowcase() {
           transition={{ duration: 0.6, delay: 0.16 }}
           style={{ fontFamily: FB, fontSize: 15, color: L.muted, lineHeight: 1.6 }}>
           From a single delivery to your entire distribution network — the same live data that powers the
-          isolation-forest anomaly monitor and the 3D network graph inside the platform.
+          anomaly monitor and the 3D network graph inside the platform.
         </motion.p>
       </div>
     </section>
@@ -229,14 +229,33 @@ function VideoShowcase() {
 }
 
 function CapabilityStrip() {
-  const items = ["Random Forest", "Isolation Forest", "Three.js / WebGL", "Real-Time Monitoring", "Resend Email", "Role-Based Access"];
+  const [hovered, setHovered] = useState(-1);
   return (
     <section style={{
-      padding: "26px 24px", borderTop: `1px solid ${L.border}`, borderBottom: `1px solid ${L.border}`,
-      background: L.panel, display: "flex", justifyContent: "center", flexWrap: "wrap", gap: "14px 34px",
+      position: "relative", padding: "34px 24px", borderTop: `1px solid ${L.border}`, borderBottom: `1px solid ${L.border}`,
+      background: L.panel, display: "flex", justifyContent: "center", alignItems: "center", gap: 26, flexWrap: "wrap",
     }}>
-      {items.map((t) => (
-        <span key={t} style={{ fontFamily: FM, fontSize: 11, color: L.faint, letterSpacing: ".04em" }}>{t}</span>
+      {FEATURES.map(({ Icon }, i) => (
+        <React.Fragment key={i}>
+          {i > 0 && (
+            <div style={{ width: 34, height: 1, background: L.border, position: "relative", overflow: "visible" }}>
+              <motion.div
+                animate={{ x: [0, 34, 0] }} transition={{ duration: 3, repeat: Infinity, ease: "linear", delay: i * 0.3 }}
+                style={{ position: "absolute", top: -1.5, width: 4, height: 4, borderRadius: "50%", background: L.cyan }}
+              />
+            </div>
+          )}
+          <motion.div
+            onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(-1)}
+            whileHover={{ scale: 1.15, y: -3 }}
+            style={{
+              width: 42, height: 42, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+              background: L.void, border: `1px solid ${hovered === i ? L.copper : L.border}`, transition: "border-color .2s",
+              cursor: "default",
+            }}>
+            <Icon size={17} color={hovered === i ? L.copper : L.muted} />
+          </motion.div>
+        </React.Fragment>
       ))}
     </section>
   );
@@ -547,7 +566,7 @@ function Footer({ onEnter }) {
 
         <div style={{ borderTop: `1px solid ${L.border}`, paddingTop: 22, display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
           <span style={{ fontFamily: FM, fontSize: 11, color: L.faint }}>© 2026 Demand Forecasting — a supply-chain AI prototype.</span>
-          <span style={{ fontFamily: FM, fontSize: 11, color: L.faint }}>Built on Random Forest, Isolation Forest &amp; Three.js</span>
+          <span style={{ fontFamily: FM, fontSize: 11, color: L.faint }}>AI-powered supply chain intelligence</span>
         </div>
       </div>
     </section>
