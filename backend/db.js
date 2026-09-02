@@ -50,6 +50,11 @@ export async function migrate() {
     CREATE INDEX IF NOT EXISTS users_email_idx  ON users (email);
     CREATE INDEX IF NOT EXISTS users_status_idx ON users (status);
 
+    -- sessions.user_id predates the users table and was TEXT; align it to
+    -- users.user_id's uuid type so the FK below can attach. Existing values
+    -- are always crypto.randomUUID() output, so the cast is safe.
+    ALTER TABLE sessions ALTER COLUMN user_id TYPE uuid USING user_id::uuid;
+
     ALTER TABLE sessions DROP CONSTRAINT IF EXISTS sessions_user_id_fkey;
     ALTER TABLE sessions
       ADD CONSTRAINT sessions_user_id_fkey
