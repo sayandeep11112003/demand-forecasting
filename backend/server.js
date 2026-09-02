@@ -6,11 +6,15 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { pool, migrate } from "./db.js";
+import { VALID_ROLES, loadUsers, saveUsers, upsertUser } from "./users.js";
+import { applySecurity, authLimiter, ingestLimiter } from "./security.js";
+import dataRouter from "./routes/data.js";
+import eventsRouter, { rescoreOnStartup } from "./routes/events.js";
+import ingestRouter from "./routes/ingest.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, ".env") });
-
-const DATA_FILE = path.join(__dirname, "data", "users.json");
 
 const PORT = process.env.PORT || 4000;
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "sayandeepvirat10@gmail.com";
@@ -22,7 +26,6 @@ const FRONTEND_URLS = [
   .map((s) => s.trim())
   .filter(Boolean);
 const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const VALID_ROLES = ["admin", "procurement_manager", "site_engineer", "quality_inspector", "sustainability_officer", "viewer"];
 const ROLE_LABELS = {
   admin: "Administrator",
   procurement_manager: "Procurement Manager",
@@ -32,17 +35,10 @@ const ROLE_LABELS = {
   viewer: "Viewer (read-only)",
 };
 
-function loadUsers() {
-  if (!fs.existsSync(DATA_FILE)) return [];
-  return JSON.parse(fs.readFileSync(DATA_FILE, "utf-8"));
-}
-function saveUsers(users) {
-  fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
-  fs.writeFileSync(DATA_FILE, JSON.stringify(users, null, 2));
-}
+if (pool) await migrate();
 
 async function seedIfEmpty() {
-  if (fs.existsSync(DATA_FILE)) return;
+  if ((await loadUsers()).length > 0) return;
   const seedAccounts = [
     ["System Administrator", "admin@tscm.local", "admin", "IT"],
     ["Priya Sharma", "priya@tscm.local", "procurement_manager", "Procurement"],
@@ -61,29 +57,9 @@ async function seedIfEmpty() {
     last_login_at: null,
     created_at: new Date().toISOString(),
   })));
-  saveUsers(users);
+  await saveUsers(users);
 }
 await seedIfEmpty();
-
-async function upsertUser(users, { full_name, email, password, role, department }) {
-  const normEmail = String(email).trim().toLowerCase();
-  const idx = users.findIndex((u) => u.email.toLowerCase() === normEmail);
-  const record = {
-    user_id: idx === -1 ? crypto.randomUUID() : users[idx].user_id,
-    full_name: String(full_name).trim(),
-    email: normEmail,
-    role: VALID_ROLES.includes(role) ? role : "viewer",
-    department: department || users[idx]?.department || "IT",
-    password_hash: await bcrypt.hash(password, 10),
-    status: "active",
-    token: null,
-    token_expires: null,
-    last_login_at: users[idx]?.last_login_at || null,
-    created_at: users[idx]?.created_at || new Date().toISOString(),
-  };
-  if (idx === -1) users.push(record); else users[idx] = record;
-  return record;
-}
 
 // Most free hosting tiers (Render, Railway) don't persist local disk across
 // deploys — each new deploy starts from a clean filesystem, which would
@@ -92,12 +68,12 @@ async function upsertUser(users, { full_name, email, password, role, department 
 async function seedPinnedAdmin() {
   const { SEED_ADMIN_NAME, SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD } = process.env;
   if (!SEED_ADMIN_NAME || !SEED_ADMIN_EMAIL || !SEED_ADMIN_PASSWORD) return;
-  const users = loadUsers();
+  const users = await loadUsers();
   await upsertUser(users, {
     full_name: SEED_ADMIN_NAME, email: SEED_ADMIN_EMAIL, password: SEED_ADMIN_PASSWORD,
     role: "admin", department: "IT",
   });
-  saveUsers(users);
+  await saveUsers(users);
 }
 await seedPinnedAdmin();
 
@@ -119,6 +95,7 @@ async function sendMail({ to, subject, html }) {
 }
 
 const app = express();
+applySecurity(app);
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || FRONTEND_URLS.includes(origin)) return callback(null, true);
@@ -171,7 +148,7 @@ app.post("/api/contact", async (req, res) => {
   }
 });
 
-app.post("/api/auth/register", async (req, res) => {
+app.post("/api/auth/register", authLimiter, async (req, res) => {
   try {
     const { full_name, email, password, role, department } = req.body || {};
     if (!full_name || !String(full_name).trim()) return res.status(400).json({ error: "Full name is required." });
@@ -181,7 +158,7 @@ app.post("/api/auth/register", async (req, res) => {
     const safeRole = VALID_ROLES.includes(role) ? role : "viewer";
     const normEmail = String(email).trim().toLowerCase();
 
-    const users = loadUsers();
+    const users = await loadUsers();
     if (users.some((u) => u.email.toLowerCase() === normEmail)) {
       return res.status(409).json({ error: "An account with this email already exists." });
     }
@@ -221,7 +198,7 @@ app.post("/api/auth/register", async (req, res) => {
     // Only persist the account once the verification email has actually gone out —
     // otherwise a failed send would silently strand a pending account nobody can approve.
     users.push(user);
-    saveUsers(users);
+    await saveUsers(users);
 
     res.json({ ok: true, status: "pending_verification" });
   } catch (err) {
@@ -230,8 +207,8 @@ app.post("/api/auth/register", async (req, res) => {
   }
 });
 
-app.get("/api/auth/verify/:token", (req, res) => {
-  const users = loadUsers();
+app.get("/api/auth/verify/:token", async (req, res) => {
+  const users = await loadUsers();
   const idx = users.findIndex((u) => u.token === req.params.token);
 
   if (idx === -1) {
@@ -249,17 +226,24 @@ app.get("/api/auth/verify/:token", (req, res) => {
   user.token = null;
   user.token_expires = null;
   users[idx] = user;
-  saveUsers(users);
+  await saveUsers(users);
 
   return res.send(htmlPage("Account approved", `${esc(user.full_name)} (${esc(user.email)}) can now sign in.`));
 });
 
-app.post("/api/auth/login", async (req, res) => {
+app.post("/api/auth/login", authLimiter, async (req, res) => {
   try {
     const { email, password } = req.body || {};
     if (!email || !password) return res.status(400).json({ error: "Email and password are required." });
 
-    const users = loadUsers();
+    if (!pool) {
+      return res.status(503).json({
+        ok: false,
+        error: "Data layer unavailable — DATABASE_URL is not configured.",
+      });
+    }
+
+    const users = await loadUsers();
     const user = users.find((u) => u.email.toLowerCase() === String(email).trim().toLowerCase());
     if (!user) return res.status(401).json({ error: "No account found with that email." });
     if (user.status === "pending") return res.status(403).json({ error: "This account is awaiting admin verification. You'll get access once approved." });
@@ -269,15 +253,30 @@ app.post("/api/auth/login", async (req, res) => {
     if (!match) return res.status(401).json({ error: "Incorrect password." });
 
     user.last_login_at = new Date().toISOString();
-    saveUsers(users);
+    await saveUsers(users);
+
+    const sessionToken = crypto.randomBytes(32).toString("hex");
+    await pool.query(
+      `INSERT INTO sessions (token, user_id, expires_at) VALUES ($1, $2, $3)`,
+      [sessionToken, user.user_id, new Date(Date.now() + TOKEN_TTL_MS)]
+    );
 
     const { password_hash, token, token_expires, ...safeUser } = user;
-    res.json({ ok: true, user: safeUser });
+    res.json({ ok: true, user: safeUser, sessionToken });
   } catch (err) {
     console.error("login error:", err);
     res.status(500).json({ error: "Login failed. Please try again." });
   }
 });
+
+if (pool) {
+  app.use("/api/data", dataRouter);
+  app.use("/api/events", eventsRouter);
+  app.use("/api/ingest", ingestLimiter, ingestRouter);
+  rescoreOnStartup();
+} else {
+  console.warn("DATABASE_URL not set — /api/data, /api/events, /api/ingest are disabled (auth still works).");
+}
 
 const DIST_DIR = path.join(__dirname, "..", "dist");
 if (fs.existsSync(DIST_DIR)) {
