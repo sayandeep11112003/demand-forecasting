@@ -7,7 +7,7 @@ import {
 import {
   Zap, LayoutGrid, FolderKanban, Factory, ScrollText, Package, Truck, ClipboardCheck,
   HardHat, Warehouse, IndianRupee, AlertTriangle, Leaf, Users, TrendingUp, Activity,
-  Plus, Pencil, Trash2, X, LogOut, Search, Lock, Inbox,
+  Plus, Pencil, Trash2, X, LogOut, Search, Lock, Inbox, GitBranch,
 } from "lucide-react";
 import { apiLogin, apiRegister } from "./api.js";
 
@@ -238,13 +238,23 @@ function buildDatabase() {
   const WORK_PACKAGES = ["Foundation", "Tower Erection", "Stringing", "Civil Works", "Equipment Installation", "Testing & Commissioning"];
   const construction_activities = [];
   projects.forEach((prj) => {
+    const projectPOs = purchase_orders.filter((po) => po.project_id === prj.project_id);
+    let prevActivityId = null;
     WORK_PACKAGES.forEach((wp, j) => {
       const ps = dateStr(2025, intBetween(0, 10), intBetween(1, 27));
-      const pf = addDays(ps, intBetween(30, 150));
+      const plannedSpanDays = intBetween(30, 150);
+      const pf = addDays(ps, plannedSpanDays);
       const delay = Math.round(between(-4, 30));
       const done = prj.percent_complete > (j + 1) * 15;
+      const activity_id = uid("ACT");
+      // Three-point PERT estimate around the planned span, so the critical-path
+      // engine has real optimistic/pessimistic bounds to derive variance from.
+      const duration_most_likely_days = plannedSpanDays;
+      const duration_optimistic_days = Math.max(5, Math.round(plannedSpanDays * between(0.6, 0.85)));
+      const duration_pessimistic_days = Math.round(plannedSpanDays * between(1.25, 1.85));
+      const linkedPO = projectPOs.length && rnd() > 0.35 ? pick(projectPOs) : null;
       construction_activities.push({
-        activity_id: uid("ACT"),
+        activity_id,
         project_id: prj.project_id,
         work_package: wp,
         activity_name: `${wp} — ${prj.project_name.split("—")[0].trim()}`,
@@ -257,8 +267,17 @@ function buildDatabase() {
         delay_reason: done && delay > 0 ? pick(["Material shortage", "Right-of-way dispute", "Heavy rainfall", "Labour shortage"]) : null,
         contractor_id: null,
         status: done ? "Completed" : (prj.percent_complete > j * 15 ? "In Progress" : "Not Started"),
+        // PERT / critical-path network: each work package depends on the one
+        // before it within the same project (a chain is a valid, degenerate
+        // dependency graph — the engine below supports general DAGs too).
+        predecessor_ids: j > 0 && prevActivityId ? [prevActivityId] : [],
+        duration_optimistic_days, duration_most_likely_days, duration_pessimistic_days,
+        // The purchase order this activity is waiting on material from, if any
+        // — lets a late shipment be traced through to schedule impact.
+        blocking_po_id: linkedPO ? linkedPO.po_id : null,
         created_at: ps,
       });
+      prevActivityId = activity_id;
     });
   });
 
@@ -548,6 +567,11 @@ const SCHEMA = {
       { k: "delay_reason", label: "Delay reason", type: "textarea" },
       { k: "contractor_id", label: "Contractor", ref: "contractors" },
       { k: "status", label: "Status", options: ["Not Started", "In Progress", "Completed", "Delayed"] },
+      { k: "predecessor_ids", label: "Depends on (predecessor activities)", type: "multiref", ref: "construction_activities" },
+      { k: "duration_optimistic_days", label: "PERT optimistic duration (days)", type: "number" },
+      { k: "duration_most_likely_days", label: "PERT most-likely duration (days)", type: "number" },
+      { k: "duration_pessimistic_days", label: "PERT pessimistic duration (days)", type: "number" },
+      { k: "blocking_po_id", label: "Waiting on material PO", ref: "purchase_orders" },
     ],
   },
   inventory: {
@@ -663,6 +687,7 @@ const REF_LABEL = {
   materials: (r) => `${r.material_code} — ${r.material_name}`,
   purchase_orders: (r) => `${r.po_number} — ${r.item_description || ""}`,
   contractors: (r) => `${r.contractor_code} — ${r.contractor_name}`,
+  construction_activities: (r) => r.activity_name,
 };
 
 /* ============================================================================
@@ -1301,7 +1326,8 @@ function RecordForm({ resourceKey, record, db, onSave, onCancel }) {
   const [form, setForm] = useState(() => {
     const init = {};
     cfg.fields.forEach((f) => {
-      init[f.k] = record ? (record[f.k] ?? "") : (f.type === "bool" ? false : "");
+      const empty = f.type === "bool" ? false : f.type === "multiref" ? [] : "";
+      init[f.k] = record ? (record[f.k] ?? empty) : empty;
     });
     return init;
   });
@@ -1339,7 +1365,36 @@ function RecordForm({ resourceKey, record, db, onSave, onCancel }) {
           return (
             <div key={f.k} style={{ gridColumn: span }}>
               <Field label={f.label + (f.req ? " *" : "")}>
-                {f.ref ? (
+                {f.type === "multiref" ? (
+                  <div style={{
+                    display: "flex", flexWrap: "wrap", gap: 6, minHeight: 38, maxHeight: 130, overflowY: "auto",
+                    border: `1px solid ${C.border}`, borderRadius: RADIUS.sm, padding: 8, background: C.panel2,
+                  }}>
+                    {db[f.ref]
+                      .filter((r) => !record || r[SCHEMA[f.ref].idKey] !== record[cfg.idKey])
+                      .filter((r) => !form.project_id || !("project_id" in r) || r.project_id === form.project_id)
+                      .map((r) => {
+                        const idKey = SCHEMA[f.ref].idKey;
+                        const selected = (form[f.k] || []).includes(r[idKey]);
+                        return (
+                          <button key={r[idKey]} type="button"
+                            onClick={() => {
+                              const cur = form[f.k] || [];
+                              set(f.k, selected ? cur.filter((x) => x !== r[idKey]) : [...cur, r[idKey]]);
+                            }}
+                            style={{
+                              fontFamily: FM, fontSize: 11.5, padding: "4px 10px", borderRadius: RADIUS.xl, cursor: "pointer",
+                              border: `1px solid ${selected ? C.copper : C.border}`,
+                              background: selected ? `${C.copper}18` : "transparent",
+                              color: selected ? C.copper : C.muted,
+                            }}>
+                            {REF_LABEL[f.ref](r)}
+                          </button>
+                        );
+                      })}
+                    {db[f.ref].length === 0 && <span style={{ color: C.faint, fontSize: 12 }}>No records yet.</span>}
+                  </div>
+                ) : f.ref ? (
                   <select style={inputStyle} value={form[f.k] ?? ""} onChange={(e) => set(f.k, e.target.value)}>
                     <option value="">— none —</option>
                     {db[f.ref].map((r) => {
@@ -2159,6 +2214,318 @@ function Monitoring({ db, user, onCreate, onSimulateEvent }) {
 }
 
 /* ============================================================================
+   CRITICAL PATH / PERT SCHEDULING
+   Classic Program Evaluation and Review Technique over the construction
+   activity network (one graph per project): a three-point estimate
+   (optimistic / most-likely / pessimistic) gives each activity an expected
+   duration and a variance, then a forward + backward pass over the
+   predecessor graph gives early/late start-finish and slack. Zero-slack
+   activities are the critical path — delay there pushes the whole project;
+   delay elsewhere is absorbed by float. Runs twice per project: once on the
+   pure PERT estimate, once with each activity's *observed* delay_days folded
+   into its duration, so the gap between the two isolates how much of the
+   current schedule slip is already-incurred real delay (material shortage,
+   weather, labour, right-of-way, etc.) rather than estimation variance.
+   Entirely client-side, same as the isolation-forest anomaly feed above —
+   runs against whatever's in `db` right now.
+   ========================================================================== */
+const MATERIAL_DELAY_REASONS = new Set(["Material shortage"]);
+
+function pertEstimate(a) {
+  const o = a.duration_optimistic_days, m = a.duration_most_likely_days, p = a.duration_pessimistic_days;
+  if (o == null || m == null || p == null) return { expected: m ?? 0, variance: 0 };
+  return { expected: (o + 4 * m + p) / 6, variance: Math.pow((p - o) / 6, 2) };
+}
+
+function runCPM(activities, { includeObservedDelay }) {
+  const byId = new Map(activities.map((a) => [a.activity_id, a]));
+  const est = new Map();
+  activities.forEach((a) => {
+    const { expected, variance } = pertEstimate(a);
+    const extra = includeObservedDelay ? Math.max(0, a.delay_days || 0) : 0;
+    est.set(a.activity_id, { expected: expected + extra, variance });
+  });
+
+  const succ = new Map(activities.map((a) => [a.activity_id, []]));
+  const indeg = new Map(activities.map((a) => [a.activity_id, 0]));
+  activities.forEach((a) => {
+    (a.predecessor_ids || []).forEach((pid) => {
+      if (!byId.has(pid)) return; // dangling ref (predecessor deleted) — ignore
+      indeg.set(a.activity_id, (indeg.get(a.activity_id) || 0) + 1);
+      succ.get(pid).push(a.activity_id);
+    });
+  });
+
+  // Kahn's algorithm for a topological order over the dependency DAG.
+  const queue = activities.filter((a) => (indeg.get(a.activity_id) || 0) === 0).map((a) => a.activity_id);
+  const indegWork = new Map(indeg);
+  const order = [];
+  while (queue.length) {
+    const id = queue.shift();
+    order.push(id);
+    succ.get(id).forEach((s) => {
+      indegWork.set(s, indegWork.get(s) - 1);
+      if (indegWork.get(s) === 0) queue.push(s);
+    });
+  }
+  // Anything left out sits on a cycle (shouldn't happen via the UI, which only
+  // offers same-project earlier-created activities) — append so it's still
+  // visible rather than silently vanishing from the schedule.
+  activities.forEach((a) => { if (!order.includes(a.activity_id)) order.push(a.activity_id); });
+
+  const ES = new Map(), EF = new Map();
+  order.forEach((id) => {
+    const preds = (byId.get(id).predecessor_ids || []).filter((pid) => byId.has(pid));
+    const es = preds.length ? Math.max(...preds.map((pid) => EF.get(pid) ?? 0)) : 0;
+    const ef = es + est.get(id).expected;
+    ES.set(id, es); EF.set(id, ef);
+  });
+
+  const projectDuration = order.length ? Math.max(...order.map((id) => EF.get(id))) : 0;
+
+  const LF = new Map(), LS = new Map();
+  [...order].reverse().forEach((id) => {
+    const succs = succ.get(id);
+    const lf = succs.length ? Math.min(...succs.map((s) => LS.get(s) ?? projectDuration)) : projectDuration;
+    const ls = lf - est.get(id).expected;
+    LF.set(id, lf); LS.set(id, ls);
+  });
+
+  const rows = new Map();
+  activities.forEach((a) => {
+    const id = a.activity_id;
+    const slack = (LS.get(id) ?? 0) - (ES.get(id) ?? 0);
+    rows.set(id, {
+      expected: est.get(id).expected, variance: est.get(id).variance,
+      es: ES.get(id) ?? 0, ef: EF.get(id) ?? 0, ls: LS.get(id) ?? 0, lf: LF.get(id) ?? 0,
+      slack, critical: slack <= 0.05,
+    });
+  });
+
+  const criticalVariance = [...rows.values()].filter((r) => r.critical).reduce((s, r) => s + r.variance, 0);
+  return { rows, projectDuration, stdDev: Math.sqrt(criticalVariance) };
+}
+
+function computeSchedule(db) {
+  const byProject = new Map();
+  db.construction_activities.forEach((a) => {
+    if (!byProject.has(a.project_id)) byProject.set(a.project_id, []);
+    byProject.get(a.project_id).push(a);
+  });
+  const poById = new Map(db.purchase_orders.map((p) => [p.po_id, p]));
+
+  const projects = [];
+  byProject.forEach((activities, project_id) => {
+    const baseline = runCPM(activities, { includeObservedDelay: false });
+    const actual = runCPM(activities, { includeObservedDelay: true });
+    const slipDays = actual.projectDuration - baseline.projectDuration;
+
+    let materialSlipDays = 0;
+    const rows = activities.map((a) => {
+      const b = baseline.rows.get(a.activity_id);
+      const c = actual.rows.get(a.activity_id);
+      const ownDelay = Math.max(0, a.delay_days || 0);
+      const isMaterialCause = MATERIAL_DELAY_REASONS.has(a.delay_reason);
+      const po = a.blocking_po_id ? poById.get(a.blocking_po_id) : null;
+      const poSlip = po && po.actual_delivery_date && po.promised_delivery_date
+        ? Math.max(0, daysBetween(po.promised_delivery_date, po.actual_delivery_date))
+        : 0;
+      if (isMaterialCause && c.critical) materialSlipDays += ownDelay;
+      return { ...a, baseline: b, actual: c, ownDelay, isMaterialCause, po, poSlip };
+    });
+
+    projects.push({
+      project_id,
+      baselineDuration: baseline.projectDuration,
+      actualDuration: actual.projectDuration,
+      slipDays, stdDevDays: actual.stdDev, materialSlipDays,
+      rows: rows.sort((x, y) => x.actual.es - y.actual.es),
+    });
+  });
+  return projects;
+}
+
+function materialImpact(row) {
+  const parts = [];
+  if (row.poSlip > 0) parts.push(`linked PO running ${row.poSlip}d late`);
+  if (row.isMaterialCause && row.ownDelay > 0) {
+    if (row.actual.critical) parts.push(`on critical path — full ${row.ownDelay}d delay reaches project finish`);
+    else if (row.ownDelay <= row.actual.slack) parts.push(`${row.ownDelay}d delay absorbed by ${Math.round(row.actual.slack)}d float`);
+    else parts.push(`float exhausted — ~${Math.round(row.ownDelay - row.actual.slack)}d spills into project finish`);
+  }
+  if (!parts.length) return null;
+  const tone = row.isMaterialCause && row.actual.critical ? C.red : row.poSlip > 0 ? C.amber : C.green;
+  return { text: parts.join(" · "), tone };
+}
+
+function CriticalPath({ db }) {
+  const schedules = useMemo(() => computeSchedule(db), [db]);
+  const projectById = useMemo(() => new Map(db.projects.map((p) => [p.project_id, p])), [db.projects]);
+  const [selected, setSelected] = useState(null);
+
+  const withActivities = schedules.filter((s) => s.rows.length > 0);
+  const activeId = selected && withActivities.some((s) => s.project_id === selected) ? selected : withActivities[0]?.project_id;
+  const sched = withActivities.find((s) => s.project_id === activeId);
+
+  if (!sched) {
+    return (
+      <>
+        <Eyebrow>Schedule Risk</Eyebrow>
+        <h1 style={{ fontFamily: FD, fontSize: 25, fontWeight: 700, margin: "0 0 22px" }}>Critical Path (PERT)</h1>
+        <EmptyState>No construction activities to schedule yet.</EmptyState>
+      </>
+    );
+  }
+
+  const scale = Math.max(1, sched.actualDuration);
+  const materialCritical = sched.rows.filter((r) => r.isMaterialCause && r.actual.critical);
+
+  return (
+    <>
+      <Eyebrow>Schedule Risk</Eyebrow>
+      <h1 style={{ fontFamily: FD, fontSize: 25, fontWeight: 700, margin: "0 0 22px" }}>Critical Path (PERT)</h1>
+      <p style={{ fontSize: 12.5, color: C.muted, margin: "-14px 0 22px", maxWidth: 760, lineHeight: 1.6 }}>
+        Three-point (optimistic / most-likely / pessimistic) duration estimates per activity, run through a
+        forward/backward critical-path pass per project. Activities with ~zero slack are on the critical path —
+        any delay there, material shortage included, pushes the whole project; delay elsewhere is absorbed by float.
+      </p>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 22 }}>
+        {withActivities.map((s) => {
+          const p = projectById.get(s.project_id);
+          const active = s.project_id === activeId;
+          return (
+            <button key={s.project_id} onClick={() => setSelected(s.project_id)} style={{
+              fontFamily: FB, fontSize: 12.5, padding: "7px 13px", borderRadius: RADIUS.xl, cursor: "pointer",
+              border: `1px solid ${active ? C.copper : C.border}`, background: active ? `${C.copper}18` : C.panel,
+              color: active ? C.copper : C.muted, fontWeight: active ? 600 : 500,
+            }}>
+              {p?.project_name || s.project_id}
+              {s.slipDays > 0.5 && <span style={{ marginLeft: 7, color: C.red, fontFamily: FM, fontSize: 10.5 }}>+{Math.round(s.slipDays)}d</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 15, marginBottom: 28 }}>
+        <KpiCard label="Baseline duration" value={Math.round(sched.baselineDuration)} unit="days"
+          sub="Pure PERT estimate, no observed delay" />
+        <KpiCard label="Current projected" value={Math.round(sched.actualDuration)} unit="days"
+          tone={sched.slipDays > 0 ? C.amber : C.green}
+          sub={`± ${sched.stdDevDays.toFixed(1)}d (1σ) on the critical path`} />
+        <KpiCard label="Schedule slip" value={Math.round(sched.slipDays)} unit="days"
+          tone={sched.slipDays > 7 ? C.red : sched.slipDays > 0 ? C.amber : C.green}
+          sub="Current projected vs. baseline critical path" />
+        <KpiCard label="Material-shortage impact" value={Math.round(sched.materialSlipDays)} unit="days"
+          tone={sched.materialSlipDays > 0 ? C.red : C.green}
+          sub={`${materialCritical.length} critical-path activit${materialCritical.length === 1 ? "y" : "ies"} material-blocked`} />
+      </div>
+
+      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: RADIUS.lg, padding: 22, marginBottom: 22 }}>
+        <Eyebrow>Timeline</Eyebrow>
+        <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
+          Activity network — critical path highlighted
+        </div>
+        <div style={{ display: "grid", gap: 8 }}>
+          {sched.rows.map((r) => {
+            const leftPct = (r.actual.es / scale) * 100;
+            const widthPct = Math.max(0.6, (r.actual.expected / scale) * 100);
+            const tone = r.actual.critical ? C.red : C.copper;
+            return (
+              <div key={r.activity_id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 150, flexShrink: 0, fontSize: 11.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.activity_name}>
+                  {r.work_package}
+                </div>
+                <div style={{ flex: 1, position: "relative", height: 18, background: C.borderSoft, borderRadius: 4 }}>
+                  <div style={{
+                    position: "absolute", left: `${leftPct}%`, width: `${widthPct}%`, height: "100%", borderRadius: 4,
+                    background: tone, opacity: r.actual.critical ? 0.9 : 0.55,
+                    boxShadow: r.actual.critical ? `0 0 0 1px ${C.red}` : "none",
+                  }} />
+                  {r.isMaterialCause && r.ownDelay > 0 && (
+                    <div title={`${r.ownDelay}d material-shortage delay`} style={{
+                      position: "absolute", left: `${Math.max(0, ((r.actual.es + r.actual.expected - r.ownDelay) / scale) * 100)}%`,
+                      width: `${Math.max(0.4, (r.ownDelay / scale) * 100)}%`, height: "100%", borderRadius: 4,
+                      background: "repeating-linear-gradient(45deg, rgba(0,0,0,.35), rgba(0,0,0,.35) 3px, transparent 3px, transparent 6px)",
+                    }} />
+                  )}
+                </div>
+                <div style={{ width: 64, flexShrink: 0, textAlign: "right", fontFamily: FM, fontSize: 10.5, color: C.muted }}>
+                  {Math.round(r.actual.slack)}d slack
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ display: "flex", gap: 18, marginTop: 16, paddingTop: 14, borderTop: `1px solid ${C.borderSoft}`, fontSize: 11, color: C.faint, flexWrap: "wrap" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: C.red }} /> Critical (zero slack)</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: C.copper, opacity: .55 }} /> Has float</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: "repeating-linear-gradient(45deg,#0008,#0008 3px,transparent 3px,transparent 6px)" }} /> Material-shortage portion</span>
+        </div>
+      </div>
+
+      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: RADIUS.lg, overflow: "hidden", boxShadow: SHADOW.sm }}>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+            <thead>
+              <tr>
+                {["Activity", "Depends on", "O / M / P (days)", "Expected", "ES–EF", "LS–LF", "Slack", "Path", "Material impact"].map((h) => (
+                  <th key={h} style={{
+                    textAlign: "left", padding: "10px 13px", fontFamily: FM, fontSize: 10.5, color: C.muted,
+                    textTransform: "uppercase", letterSpacing: ".04em", fontWeight: 500,
+                    borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap",
+                  }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {sched.rows.map((r) => {
+                const preds = (r.predecessor_ids || [])
+                  .map((pid) => db.construction_activities.find((a) => a.activity_id === pid)?.work_package)
+                  .filter(Boolean);
+                const impact = materialImpact(r);
+                return (
+                  <tr key={r.activity_id}>
+                    <td style={{ padding: "9px 13px", borderBottom: `1px solid ${C.borderSoft}` }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 500 }}>{r.work_package}</div>
+                      <div style={{ fontFamily: FM, fontSize: 10, color: C.faint }}>{r.status}</div>
+                    </td>
+                    <td style={{ padding: "9px 13px", borderBottom: `1px solid ${C.borderSoft}`, color: C.muted, fontSize: 11.5 }}>
+                      {preds.length ? preds.join(", ") : <span style={{ color: C.faint }}>— start —</span>}
+                    </td>
+                    <td style={{ padding: "9px 13px", borderBottom: `1px solid ${C.borderSoft}`, fontFamily: FM, fontSize: 11.5, color: C.muted, whiteSpace: "nowrap" }}>
+                      {r.duration_optimistic_days ?? "—"} / {r.duration_most_likely_days ?? "—"} / {r.duration_pessimistic_days ?? "—"}
+                    </td>
+                    <td style={{ padding: "9px 13px", borderBottom: `1px solid ${C.borderSoft}`, fontFamily: FM, fontSize: 11.5 }}>
+                      {r.actual.expected.toFixed(1)}d
+                    </td>
+                    <td style={{ padding: "9px 13px", borderBottom: `1px solid ${C.borderSoft}`, fontFamily: FM, fontSize: 11.5, whiteSpace: "nowrap" }}>
+                      {Math.round(r.actual.es)}–{Math.round(r.actual.ef)}
+                    </td>
+                    <td style={{ padding: "9px 13px", borderBottom: `1px solid ${C.borderSoft}`, fontFamily: FM, fontSize: 11.5, whiteSpace: "nowrap" }}>
+                      {Math.round(r.actual.ls)}–{Math.round(r.actual.lf)}
+                    </td>
+                    <td style={{ padding: "9px 13px", borderBottom: `1px solid ${C.borderSoft}`, fontFamily: FM, fontSize: 11.5, color: r.actual.critical ? C.red : C.muted }}>
+                      {Math.round(r.actual.slack)}d
+                    </td>
+                    <td style={{ padding: "9px 13px", borderBottom: `1px solid ${C.borderSoft}` }}>
+                      <Pill value={r.actual.critical ? "Critical" : "Float"} />
+                    </td>
+                    <td style={{ padding: "9px 13px", borderBottom: `1px solid ${C.borderSoft}`, fontSize: 11.5, color: impact?.tone || C.faint, maxWidth: 260 }}>
+                      {impact ? impact.text : "—"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ============================================================================
    ROOT APP
    ========================================================================== */
 export default function App() {
@@ -2265,6 +2632,7 @@ export default function App() {
     { key: "overview", label: "Overview", Icon: LayoutGrid },
     ...Object.keys(SCHEMA).map((k) => ({ key: k, label: SCHEMA[k].label, Icon: SCHEMA[k].icon })),
     { key: "forecasting", label: "AI Forecasting", Icon: TrendingUp },
+    { key: "criticalpath", label: "Critical Path (PERT)", Icon: GitBranch },
     { key: "monitoring", label: "Live Monitoring", Icon: Activity },
   ];
 
@@ -2351,6 +2719,7 @@ export default function App() {
               transition={{ duration: 0.18, ease: "easeOut" }}>
               {route === "overview" && <Overview db={db} user={user} go={setRoute} />}
               {route === "forecasting" && <Forecasting db={db} />}
+              {route === "criticalpath" && <CriticalPath db={db} />}
               {route === "monitoring" && (
                 <Monitoring db={db} user={user} onCreate={createRecord} onSimulateEvent={simulateLiveEvent} />
               )}

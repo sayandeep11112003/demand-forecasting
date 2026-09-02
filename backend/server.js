@@ -1,6 +1,6 @@
+import "./env.js";
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import fs from "fs";
@@ -14,7 +14,6 @@ import eventsRouter, { rescoreOnStartup } from "./routes/events.js";
 import ingestRouter from "./routes/ingest.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.join(__dirname, ".env") });
 
 const PORT = process.env.PORT || 4000;
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "sayandeepvirat10@gmail.com";
