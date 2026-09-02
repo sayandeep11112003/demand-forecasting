@@ -2358,6 +2358,160 @@ function materialImpact(row) {
   return { text: parts.join(" · "), tone };
 }
 
+/* ============================================================================
+   PRIMAVERA P6 EXPORT (XER)
+   Table/field names and enum constants (TK_*, TT_Task, DT_FixedDrtn, PR_FS)
+   verified against the PyP6Xer library's documented read/write model
+   (hassanemam.github.io/PyP6Xer) — Oracle doesn't publish the XER schema
+   itself. The one piece that ISN'T independently verified against a real
+   sample is each calendar's internal `clndr_data` working-hours string,
+   Primavera's own undocumented mini-language — reconstructed from PyP6Xer's
+   parsing regexes. If P6 shows odd working-time behaviour after import,
+   re-point the calendar in P6 (a two-click fix) rather than distrusting the
+   rest of the file; everything else here is validated against the library's
+   actual field lists.
+   ========================================================================== */
+function xerDateTime(iso, time = "08:00") {
+  return iso ? `${iso} ${time}` : "";
+}
+
+function xerRow(fieldNames, values) {
+  return ["%R", ...fieldNames.map((f) => {
+    const v = values[f];
+    return v === undefined || v === null ? "" : v;
+  })].join("\t");
+}
+
+const XER_FIELDS = {
+  PROJECT: ["proj_id", "fy_start_month_num", "rsrc_self_add_flag", "allow_complete_flag", "rsrc_multi_assign_flag",
+    "checkout_flag", "project_flag", "step_complete_flag", "cost_qty_recalc_flag", "batch_sum_flag", "name_sep_char",
+    "def_complete_pct_type", "proj_short_name", "acct_id", "orig_proj_id", "source_proj_id", "base_type_id", "clndr_id",
+    "sum_base_proj_id", "task_code_base", "task_code_step", "priority_num", "wbs_max_sum_level", "strgy_priority_num",
+    "last_checksum", "critical_drtn_hr_cnt", "def_cost_per_qty", "last_recalc_date", "plan_start_date", "plan_end_date",
+    "scd_end_date", "add_date", "last_tasksum_date", "fcst_start_date", "def_duration_type", "task_code_prefix", "guid",
+    "def_qty_type", "add_by_name", "web_local_root_path", "proj_url", "def_rate_type", "add_act_remain_flag",
+    "act_this_per_link_flag", "def_task_type", "act_pct_link_flag", "critical_path_type", "task_code_prefix_flag",
+    "def_rollup_dates_flag", "use_project_baseline_flag", "rem_target_link_flag", "reset_planned_flag",
+    "allow_neg_act_flag", "sum_assign_level", "last_fin_dates_id", "last_baseline_update_date", "cr_external_key",
+    "apply_actuals_date", "fintmpl_id", "location_id", "loaded_scope_level", "export_flag", "new_fin_dates_id",
+    "baselines_to_export", "baseline_names_to_export", "next_data_date", "close_period_flag", "sum_refresh_date",
+    "trsrcsum_loaded", "sumtask_loaded"],
+  CALENDAR: ["clndr_id", "default_flag", "clndr_name", "proj_id", "base_clndr_id", "last_chng_date", "clndr_type",
+    "day_hr_cnt", "week_hr_cnt", "month_hr_cnt", "year_hr_cnt", "rsrc_private", "clndr_data"],
+  OBS: ["obs_id", "parent_obs_id", "guid", "seq_num", "obs_name", "obs_descr"],
+  PROJWBS: ["wbs_id", "proj_id", "obs_id", "seq_num", "est_wt", "proj_node_flag", "sum_data_flag", "status_code",
+    "wbs_short_name", "wbs_name", "phase_id", "parent_wbs_id", "ev_user_pct", "ev_etc_user_value", "orig_cost",
+    "indep_remain_total_cost", "ann_dscnt_rate_pct", "dscnt_period_type", "indep_remain_work_qty", "anticip_start_date",
+    "anticip_end_date", "ev_compute_type", "ev_etc_compute_type", "guid", "tmpl_guid", "plan_open_state"],
+  TASK: ["task_id", "proj_id", "wbs_id", "clndr_id", "phys_complete_pct", "rev_fdbk_flag", "est_wt", "lock_plan_flag",
+    "auto_compute_act_flag", "complete_pct_type", "task_type", "duration_type", "status_code", "task_code", "task_name",
+    "rsrc_id", "total_float_hr_cnt", "free_float_hr_cnt", "remain_drtn_hr_cnt", "act_work_qty", "remain_work_qty",
+    "target_work_qty", "target_drtn_hr_cnt", "target_equip_qty", "act_equip_qty", "remain_equip_qty", "cstr_date",
+    "act_start_date", "act_end_date", "late_start_date", "late_end_date", "expect_end_date", "early_start_date",
+    "early_end_date", "restart_date", "reend_date", "target_start_date", "target_end_date", "rem_late_start_date",
+    "rem_late_end_date", "cstr_type", "priority_type", "suspend_date", "resume_date", "int_path", "int_path_order",
+    "guid", "tmpl_guid", "cstr_date2", "cstr_type2", "driving_path_flag", "act_this_per_work_qty",
+    "act_this_per_equip_qty", "external_early_start_date", "external_late_end_date", "create_date", "update_date",
+    "create_user", "update_user", "location_id"],
+  TASKPRED: ["task_pred_id", "task_id", "pred_task_id", "proj_id", "pred_proj_id", "pred_type", "lag_hr_cnt", "comments",
+    "float_path", "aref", "arls"],
+};
+
+// Mon–Fri, 08:00–17:00. Day numbering is Primavera's own (1=Sunday..7=Saturday).
+const STANDARD_WORKWEEK_CLNDR_DATA =
+  "(0||CalendarData()(DaysOfWeek(1()2(0||08:00s|17:00f())3(0||08:00s|17:00f())4(0||08:00s|17:00f())" +
+  "5(0||08:00s|17:00f())6(0||08:00s|17:00f())7())))";
+
+function buildXER(project, rows) {
+  const today = todayISO();
+  const projId = 1, wbsId = 1, clndrId = 1, obsId = 1;
+  const idByActivity = new Map(rows.map((r, i) => [r.activity_id, i + 1]));
+  const baseDate = project.planned_start_date;
+
+  const lines = [];
+  lines.push(["ERMHDR", "21.12", today, "Project", "admin", "Demand Forecasting", "USD", "demand_forecasting", "Project Management"].join("\t"));
+
+  lines.push("%T\tOBS");
+  lines.push(["%F", ...XER_FIELDS.OBS].join("\t"));
+  lines.push(xerRow(XER_FIELDS.OBS, { obs_id: obsId, obs_name: project.client_owner || "Owner" }));
+
+  lines.push("%T\tCALENDAR");
+  lines.push(["%F", ...XER_FIELDS.CALENDAR].join("\t"));
+  lines.push(xerRow(XER_FIELDS.CALENDAR, {
+    clndr_id: clndrId, default_flag: "Y", clndr_name: "Standard 5-Day Workweek", clndr_type: "CA_Project",
+    day_hr_cnt: 8, week_hr_cnt: 40, month_hr_cnt: 172, year_hr_cnt: 2000,
+    clndr_data: STANDARD_WORKWEEK_CLNDR_DATA,
+  }));
+
+  lines.push("%T\tPROJECT");
+  lines.push(["%F", ...XER_FIELDS.PROJECT].join("\t"));
+  lines.push(xerRow(XER_FIELDS.PROJECT, {
+    proj_id: projId, clndr_id: clndrId, proj_short_name: String(project.project_code || project.project_id).slice(0, 30),
+    plan_start_date: xerDateTime(project.planned_start_date), plan_end_date: xerDateTime(project.planned_end_date),
+    add_date: xerDateTime(today), def_duration_type: "DT_FixedDrtn", export_flag: "Y",
+  }));
+
+  lines.push("%T\tPROJWBS");
+  lines.push(["%F", ...XER_FIELDS.PROJWBS].join("\t"));
+  lines.push(xerRow(XER_FIELDS.PROJWBS, {
+    wbs_id: wbsId, proj_id: projId, obs_id: obsId, seq_num: 1, proj_node_flag: "Y", sum_data_flag: "N",
+    wbs_short_name: String(project.project_code || "WBS").slice(0, 20), wbs_name: project.project_name || "Project",
+  }));
+
+  lines.push("%T\tTASK");
+  lines.push(["%F", ...XER_FIELDS.TASK].join("\t"));
+  rows.forEach((r) => {
+    const id = idByActivity.get(r.activity_id);
+    const statusCode = r.status === "Completed" ? "TK_Complete" : r.status === "In Progress" ? "TK_Active" : "TK_NotStart";
+    lines.push(xerRow(XER_FIELDS.TASK, {
+      task_id: id, proj_id: projId, wbs_id: wbsId, clndr_id: clndrId,
+      phys_complete_pct: r.percent_complete ?? 0,
+      task_type: "TT_Task", duration_type: "DT_FixedDrtn", status_code: statusCode,
+      task_code: `ACT${String(id).padStart(4, "0")}`, task_name: (r.activity_name || r.work_package).slice(0, 100),
+      total_float_hr_cnt: Math.round(r.actual.slack * 8), free_float_hr_cnt: Math.round(r.actual.slack * 8),
+      remain_drtn_hr_cnt: r.status === "Completed" ? 0 : Math.round(r.actual.expected * 8),
+      target_drtn_hr_cnt: Math.round(r.actual.expected * 8),
+      act_start_date: xerDateTime(r.actual_start_date), act_end_date: xerDateTime(r.actual_finish_date),
+      early_start_date: baseDate ? xerDateTime(addDays(baseDate, Math.round(r.actual.es))) : "",
+      early_end_date: baseDate ? xerDateTime(addDays(baseDate, Math.round(r.actual.ef))) : "",
+      late_start_date: baseDate ? xerDateTime(addDays(baseDate, Math.round(r.actual.ls))) : "",
+      late_end_date: baseDate ? xerDateTime(addDays(baseDate, Math.round(r.actual.lf))) : "",
+      target_start_date: xerDateTime(r.planned_start_date), target_end_date: xerDateTime(r.planned_finish_date),
+      driving_path_flag: r.actual.critical ? "Y" : "N",
+    }));
+  });
+
+  lines.push("%T\tTASKPRED");
+  lines.push(["%F", ...XER_FIELDS.TASKPRED].join("\t"));
+  let predSeq = 1;
+  rows.forEach((r) => {
+    (r.predecessor_ids || []).forEach((pid) => {
+      const predId = idByActivity.get(pid);
+      if (!predId) return;
+      lines.push(xerRow(XER_FIELDS.TASKPRED, {
+        task_pred_id: predSeq++, task_id: idByActivity.get(r.activity_id), pred_task_id: predId,
+        proj_id: projId, pred_proj_id: projId, pred_type: "PR_FS", lag_hr_cnt: 0,
+      }));
+    });
+  });
+
+  lines.push("%E");
+  return lines.join("\r\n");
+}
+
+function downloadXER(project, sched) {
+  const content = buildXER(project, sched.rows);
+  const blob = new Blob([content], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${String(project.project_code || project.project_id).replace(/[^a-z0-9_-]/gi, "_")}.xer`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 function CriticalPath({ db }) {
   const schedules = useMemo(() => computeSchedule(db), [db]);
   const projectById = useMemo(() => new Map(db.projects.map((p) => [p.project_id, p])), [db.projects]);
@@ -2380,10 +2534,17 @@ function CriticalPath({ db }) {
   const scale = Math.max(1, sched.actualDuration);
   const materialCritical = sched.rows.filter((r) => r.isMaterialCause && r.actual.critical);
 
+  const activeProject = projectById.get(sched.project_id);
+
   return (
     <>
       <Eyebrow>Schedule Risk</Eyebrow>
-      <h1 style={{ fontFamily: FD, fontSize: 25, fontWeight: 700, margin: "0 0 22px" }}>Critical Path (PERT)</h1>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+        <h1 style={{ fontFamily: FD, fontSize: 25, fontWeight: 700, margin: "0 0 22px" }}>Critical Path (PERT)</h1>
+        <Btn onClick={() => downloadXER(activeProject, sched)} title="Downloads a .xer file for the selected project — import via P6's File > Import.">
+          <ScrollText size={14} /> Export to Primavera P6 (XER)
+        </Btn>
+      </div>
       <p style={{ fontSize: 12.5, color: C.muted, margin: "-14px 0 22px", maxWidth: 760, lineHeight: 1.6 }}>
         Three-point (optimistic / most-likely / pessimistic) duration estimates per activity, run through a
         forward/backward critical-path pass per project. Activities with ~zero slack are on the critical path —
